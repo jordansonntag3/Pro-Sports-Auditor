@@ -7,11 +7,23 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="Pro Sports Auditor", page_icon="🎯", layout="wide")
 st.title("🎯 The Push-Button Auditor")
 
-# 2. Smart API Key Logic
+# 2. API & Data Loading
 try:
     api_key = st.secrets["ODDS_API_KEY"]
 except Exception:
     api_key = "455298a2458c5781e144d28f0f8f97bc"
+
+# Load the 4:00 AM Opening Lines from GitHub
+@st.cache_data(ttl=600)
+def load_opening_data():
+    try:
+        # This looks for the file the GitHub Robot created
+        df = pd.read_csv("opening_lines.csv")
+        return df
+    except:
+        return pd.DataFrame()
+
+opening_df = load_opening_data()
 
 # 3. AUDIT SETTINGS
 st.markdown("### 🛠️ Audit Settings")
@@ -25,108 +37,77 @@ with col2:
     leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl"}
     selected_sports = st.multiselect("Select Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
 
-# 4. Clean Status Metrics
-st.markdown("---")
-m1, m2, m3 = st.columns(3)
-m1.metric("Target Window", horizon)
-m2.metric("Min. Edge", f"{min_edge} pts")
-m3.metric("Market Sources", "FD vs. PIN")
-st.markdown("---")
-
-# 5. Date Logic (Fixed for Central Time)
-# Subtract 5 hours from UTC to match Central Daylight Time (CDT)
+# 4. Date Logic (Central Time Fix)
 local_now = datetime.utcnow() - timedelta(hours=5)
-# Lock to exactly 12:00 AM Central Time
 today_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 if horizon == "Today Only":
-    start_local = today_start_local
-    end_local = start_local + timedelta(days=1)
+    start_local, end_local = today_start_local, today_start_local + timedelta(days=1)
 elif horizon == "Tomorrow Only":
-    start_local = today_start_local + timedelta(days=1)
-    end_local = start_local + timedelta(days=1)
-else: # Next 48 Hours
-    start_local = today_start_local
-    end_local = start_local + timedelta(days=2)
+    start_local, end_local = today_start_local + timedelta(days=1), today_start_local + timedelta(days=2)
+else:
+    start_local, end_local = today_start_local, today_start_local + timedelta(days=2)
 
-# Convert the CDT bounds back to UTC for the API
 time_from = (start_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-# 6. The Auditor Engine
+# 5. The Auditor Engine
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
-    with st.spinner(f"Analyzing {horizon} market health..."):
+    with st.spinner(f"Scanning {horizon}..."):
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
-            params = {
-                "apiKey": api_key, 
-                "regions": "us,eu", 
-                "markets": "spreads", 
-                "bookmakers": "fanduel,pinnacle", 
-                "commenceTimeFrom": time_from, 
-                "commenceTimeTo": time_to
-            }
+            params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
+            
             try:
-                response = requests.get(url, params=params)
-                data = response.json()
-                for game in data:
-                    away_team = game.get('away_team')
-                    home_team = game.get('home_team')
-                    
-                    fd_away_line, pin_away_line = None, None
+                response = requests.get(url, params=params).json()
+                for game in response:
+                    matchup = f"{game.get('away_team')} @ {game.get('home_team')}"
+                    fd_away, pin_away = None, None
                     
                     for book in game.get('bookmakers', []):
-                        markets = book.get('markets', [])
-                        if not markets: continue
-                        
-                        outcomes = markets[0].get('outcomes', [])
-                        for outcome in outcomes:
-                            # Isolate the away team's spread to compare apples to apples
-                            if outcome.get('name') == away_team:
-                                if book['key'] == 'fanduel':
-                                    fd_away_line = outcome.get('point')
-                                elif book['key'] == 'pinnacle':
-                                    pin_away_line = outcome.get('point')
-                    
-                    if fd_away_line is not None and pin_away_line is not None:
-                        edge = abs(fd_away_line - pin_away_line)
+                        outcomes = book.get('markets', [{}])[0].get('outcomes', [])
+                        for o in outcomes:
+                            if o.get('name') == game.get('away_team'):
+                                if book['key'] == 'fanduel': fd_away = o.get('point')
+                                elif book['key'] == 'pinnacle': pin_away = o.get('point')
+
+                    if fd_away is not None and pin_away is not None:
+                        edge = abs(fd_away - pin_away)
                         if edge >= min_edge:
-                            conf = round(7.0 + (edge * 0.4), 1)
+                            # 🟢 TARGET BET LOGIC
+                            target_team = game.get('away_team') if fd_away > pin_away else game.get('home_team')
+                            target_line = fd_away if fd_away > pin_away else -fd_away
                             
-                            # TARGET BET LOGIC: Determine who to bet on at FanDuel
-                            if fd_away_line > pin_away_line:
-                                target_team = away_team
-                                target_line = fd_away_line
-                            else:
-                                target_team = home_team
-                                target_line = -fd_away_line # The inverse line for the home team
-                            
-                            # Format for readability (+ and - signs)
-                            def format_line(line):
-                                return f"+{line}" if line > 0 else f"{line}"
+                            # 📊 LINE MOVEMENT LOGIC
+                            movement_str = "No Morning Data"
+                            if not opening_df.empty:
+                                morning_row = opening_df[opening_df['Matchup'] == matchup]
+                                if not morning_row.empty:
+                                    # Compare current Pinnacle to morning Pinnacle
+                                    morning_pin = morning_row['Open_Pinnacle'].values[0]
+                                    move = pin_away - morning_pin
+                                    if move > 0: movement_str = f"📈 +{move} pts"
+                                    elif move < 0: movement_str = f"📉 {move} pts"
+                                    else: movement_str = "↔️ Stable"
+
+                            def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             
                             all_results.append({
-                                "Target Bet": f"🟢 {target_team} {format_line(target_line)}",
-                                "Matchup": f"{away_team} @ {home_team}",
-                                "FanDuel Line": format_line(fd_away_line),
-                                "Pinnacle Line": format_line(pin_away_line),
+                                "Target Bet": f"🟢 {target_team} {fmt(target_line)}",
+                                "Matchup": matchup,
+                                "Movement (PIN)": movement_str,
+                                "FanDuel": fmt(fd_away),
+                                "Pinnacle": fmt(pin_away),
                                 "Edge": f"{edge} pts",
-                                "Confidence": f"{conf}/10",
-                                "Sport": name,
                                 "Start": pd.to_datetime(game['commence_time']).strftime('%m/%d %H:%M')
                             })
-            except Exception as e:
-                st.error(f"Scan failed for {name}: {e}")
+            except: st.error(f"Failed to scan {name}")
 
     if all_results:
-        st.success(f"🚨 Found {len(all_results)} targets for {horizon}!")
+        st.success(f"🚨 Found {len(all_results)} targets!")
         df = pd.DataFrame(all_results)
-        
-        # Shift the index so it starts at 1 instead of 0
         df.index = df.index + 1
-        
         st.dataframe(df, use_container_width=True)
-        st.info("💡 **Intelligence Note:** Market mismatches identified. Awaiting roster health check.")
     else:
-        st.warning(f"No mechanical mismatches found for {horizon}. Markets are tight.")
+        st.warning(f"No mechanical mismatches found for {horizon}.")
