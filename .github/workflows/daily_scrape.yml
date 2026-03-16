@@ -15,7 +15,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          # This tells the robot to use your VIP badge instead of the default one
+          # Use your new VIP badge here
           token: ${{ secrets.SCRAPER_TOKEN }}
 
       - name: Setup Python
@@ -31,14 +31,10 @@ jobs:
           ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
         run: python scraper.py
 
-      - name: Force Push CSV
-        run: |
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git add opening_lines.csv
-          if git diff --staged --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Automated update: 4:00 AM Lines"
-            git push origin HEAD:main
-          fi
+      - name: Push CSV Changes
+        # This is a pre-built tool that handles the "128" error for us
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Automated update: 4:00 AM Lines"
+          file_pattern: 'opening_lines.csv'
+          branch: main
