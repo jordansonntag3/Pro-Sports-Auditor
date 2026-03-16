@@ -42,4 +42,45 @@ def fetch_opening_lines():
                                 pin_away = outcome.get('point')
                 
                 if fd_away is not None and pin_away is not None:
-                    all_results.
+                    all_results.append({
+                        "Matchup": f"{away_team} @ {game.get('home_team')}",
+                        "Sport": name,
+                        "Open_FanDuel": fd_away,
+                        "Open_Pinnacle": pin_away,
+                        "Start_Time": game.get('commence_time'), # Keep UTC for the janitor
+                        "Recorded_At": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+                    })
+        except Exception as e:
+            print(f"Error fetching {name}: {e}")
+            
+    return pd.DataFrame(all_results)
+
+def main():
+    # Fetch fresh data
+    new_data = fetch_opening_lines()
+    if new_data.empty:
+        print("No data found. Skipping update.")
+        return
+
+    # Load existing data if it exists
+    if os.path.exists(FILE_NAME):
+        existing_df = pd.read_csv(FILE_NAME)
+        # Combine new scans with old records
+        df = pd.concat([existing_df, new_data])
+    else:
+        df = new_data
+
+    # --- THE JANITOR: SELF-CLEANING LOGIC ---
+    # Delete any games where the start time is in the past
+    current_utc = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    df = df[df['Start_Time'] > current_utc]
+
+    # Remove duplicates: If a game is already in the list, keep the earliest (Opening) line
+    df = df.drop_duplicates(subset=['Matchup'], keep='first')
+
+    # Save the cleaned, updated list back to GitHub
+    df.to_csv(FILE_NAME, index=False)
+    print(f"Successfully updated {FILE_NAME}. Total active games tracked: {len(df)}")
+
+if __name__ == "__main__":
+    main()
