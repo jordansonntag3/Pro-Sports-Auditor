@@ -13,13 +13,10 @@ try:
 except Exception:
     api_key = "455298a2458c5781e144d28f0f8f97bc"
 
-# Load the 4:00 AM Opening Lines from GitHub
 @st.cache_data(ttl=600)
 def load_opening_data():
     try:
-        # This looks for the file the GitHub Robot created
-        df = pd.read_csv("opening_lines.csv")
-        return df
+        return pd.read_csv("opening_lines.csv")
     except:
         return pd.DataFrame()
 
@@ -34,10 +31,14 @@ with col1:
     min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 3.0, 1.0, 0.5)
 
 with col2:
-    leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl"}
+    leagues = {
+        "NBA": "basketball_nba", 
+        "NHL": "icehockey_nhl", 
+        "NFL": "americanfootball_nfl"
+    }
     selected_sports = st.multiselect("Select Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
 
-# 4. Date Logic (Central Time Fix)
+# 4. Date Logic
 local_now = datetime.utcnow() - timedelta(hours=5)
 today_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -51,10 +52,10 @@ else:
 time_from = (start_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-# 5. The Auditor Engine
+# 5. Engine
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
-    with st.spinner(f"Scanning {horizon}..."):
+    with st.spinner(f"Analyzing {horizon} markets..."):
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
             params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
@@ -75,16 +76,13 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     if fd_away is not None and pin_away is not None:
                         edge = abs(fd_away - pin_away)
                         if edge >= min_edge:
-                            # 🟢 TARGET BET LOGIC
                             target_team = game.get('away_team') if fd_away > pin_away else game.get('home_team')
                             target_line = fd_away if fd_away > pin_away else -fd_away
                             
-                            # 📊 LINE MOVEMENT LOGIC
                             movement_str = "No Morning Data"
                             if not opening_df.empty:
                                 morning_row = opening_df[opening_df['Matchup'] == matchup]
                                 if not morning_row.empty:
-                                    # Compare current Pinnacle to morning Pinnacle
                                     morning_pin = morning_row['Open_Pinnacle'].values[0]
                                     move = pin_away - morning_pin
                                     if move > 0: movement_str = f"📈 +{move} pts"
@@ -102,7 +100,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 "Edge": f"{edge} pts",
                                 "Start": pd.to_datetime(game['commence_time']).strftime('%m/%d %H:%M')
                             })
-            except: st.error(f"Failed to scan {name}")
+            except: pass
 
     if all_results:
         st.success(f"🚨 Found {len(all_results)} targets!")
