@@ -2,9 +2,12 @@ name: Daily Opening Lines Scraper
 
 on:
   schedule:
-    # Runs at 9:00 AM UTC (4:00 AM Central Time)
     - cron: '0 9 * * *'
-  workflow_dispatch: # This adds the "Manual Run" button
+  workflow_dispatch: 
+
+# THIS BLOCK IS THE FIX: It forces write access for the robot
+permissions:
+  contents: write
 
 jobs:
   scrape:
@@ -12,6 +15,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+        with:
+          persist-credentials: true # Keeps the login active for the push
 
       - name: Setup Python
         uses: actions/setup-python@v4
@@ -31,5 +36,6 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add opening_lines.csv
-          git commit -m "Automated update: 4:00 AM Lines + Purge" || exit 0
-          git push
+          # The '|| exit 0' prevents it from failing if there are no new games to save
+          git commit -m "Automated update: 4:00 AM Lines" || exit 0
+          git push origin main
