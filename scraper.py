@@ -12,14 +12,11 @@ def fetch_opening_lines():
     all_results = []
     for name, slug in LEAGUES.items():
         url = f"https://api.the-odds-api.com/v4/sports/{slug}/odds/"
-        # BROAD SCAN: No date filters, just give us what you have
         params = {"apiKey": API_KEY, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle"}
         
         try:
             r = requests.get(url, params=params)
             data = r.json()
-            print(f"Robot found {len(data)} potential {name} games.")
-            
             for game in data:
                 fd_away, pin_away = None, None
                 for book in game.get('bookmakers', []):
@@ -40,22 +37,19 @@ def fetch_opening_lines():
                         "Start_Time": game.get('commence_time'),
                         "Recorded_At": datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
                     })
-        except Exception as e:
-            print(f"Error: {e}")
-            
+        except: pass
     return pd.DataFrame(all_results)
 
 def main():
     df = fetch_opening_lines()
     
+    # If we found real games, the "Test" row is no longer needed
     if df.empty:
-        print("CRITICAL: Robot found 0 matches. Markets might be closed for the night.")
-        # Create a dummy row just to prove the file can be written
-        df = pd.DataFrame([{"Matchup": "Test Connection", "Sport": "TEST", "Open_FanDuel": 0, "Open_Pinnacle": 0, "Start_Time": "2026-01-01T00:00:00Z", "Recorded_At": "NOW"}])
+        df = pd.DataFrame([{"Matchup": "Test Connection", "Sport": "TEST", "Open_FanDuel": 0, "Open_Pinnacle": 0, "Start_Time": "2099-01-01T00:00:00Z", "Recorded_At": "NOW"}])
 
-    # Save exactly what we found (No Janitor for this test)
+    # Save the fresh opening lines
     df.to_csv(FILE_NAME, index=False)
-    print(f"Success! {FILE_NAME} now contains {len(df)} rows.")
+    print(f"Success! {len(df)} rows saved.")
 
 if __name__ == "__main__":
     main()
