@@ -52,6 +52,8 @@ time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     with st.spinner(f"Analyzing {horizon} markets..."):
+        current_utc = datetime.utcnow() # Gets the exact time right now
+        
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
             params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
@@ -59,6 +61,14 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             try:
                 response = requests.get(url, params=params).json()
                 for game in response:
+                    
+                    # --- NEW FILTER: HIDE PAST GAMES ---
+                    # Checks if the game has already started. If yes, skip to the next one.
+                    game_start_utc = datetime.strptime(game['commence_time'], '%Y-%m-%dT%H:%M:%SZ')
+                    if game_start_utc < current_utc:
+                        continue 
+                    # -----------------------------------
+
                     away_team = game.get('away_team')
                     home_team = game.get('home_team')
                     fd_away, pin_away = None, None
@@ -102,7 +112,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 "FanDuel": fmt(fd_away),
                                 "Pinnacle": fmt(pin_away),
                                 "Edge": f"{edge} pts",
-                                # TIMEZONE FIX: Converts UTC to Central Time and formats as 12-hour clock
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')
                             })
             except: pass
