@@ -98,18 +98,4 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             all_results.append({
                                 "Target Bet": f"🟢 {target_team} {fmt(target_line)}",
                                 "Matchup": f"{away_team} @ {home_team}",
-                                "Movement (PIN)": movement_str,
-                                "FanDuel": fmt(fd_away),
-                                "Pinnacle": fmt(pin_away),
-                                "Edge": f"{edge} pts",
-                                "Start": pd.to_datetime(game['commence_time']).strftime('%m/%d %H:%M')
-                            })
-            except: pass
-
-    if all_results:
-        st.success(f"🚨 Found {len(all_results)} targets!")
-        df = pd.DataFrame(all_results)
-        df.index = df.index + 1
-        st.dataframe(df, use_container_width=True)
-    else:
-        st.warning(f"No mechanical mismatches found for {horizon}.")
+                                "Movement (PIN
