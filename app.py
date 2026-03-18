@@ -17,25 +17,57 @@ if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION ---
+# --- UPDATED AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
-    safety_settings = [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
+    
+    # Maximize safety overrides to stop the "Busy" error
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+    ]
+
     prompt = f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."
+    
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"google_search": {}}],
         "safetySettings": safety_settings 
     }
+    
     try:
-        time.sleep(1.5) 
+        time.sleep(1.5) # Protect Quota
         response = requests.post(url, json=payload, timeout=20).json()
+        
+        # 1. Check for API-level errors (Quota/Key issues)
+        if "error" in response:
+            msg = response["error"].get("message", "").lower()
+            if "quota" in msg: return "🛑 QUOTA EXCEEDED"
+            return f"⚠️ API ERROR: {response['error'].get('message')[:50]}"
+
+        # 2. Check for Safety Blocks
         candidates = response.get('candidates', [])
-        if candidates:
-            return candidates[0].get('content', {}).get('parts', [])[0]['text'].strip()
-        return "⚠️ Intelligence Busy"
-    except:
-        return "⚠️ Connection Error"
+        if not candidates:
+            return "🛑 BLOCKED: AI Safety Filter triggered"
+
+        # 3. Check for Search/Finish reasons
+        finish_reason = candidates[0].get('finishReason')
+        if finish_reason == 'SAFETY':
+            return "🛑 BLOCKED: Content Flagged"
+        elif finish_reason == 'RECITATION':
+            return "⚠️ BLOCKED: Copyright Filter"
+
+        # 4. Success Path
+        parts = candidates[0].get('content', {}).get('parts', [])
+        if parts and 'text' in parts[0]:
+            return parts[0]['text'].strip()
+            
+        return "⚠️ SEARCH FAILED: No info found"
+        
+    except Exception as e:
+        return f"⚠️ CONNECTION ERROR: {str(e)[:30]}"
 
 @st.cache_data(ttl=600)
 def load_opening_data():
@@ -58,7 +90,6 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
-        # --- NEW SCAN WINDOW OPTIONS ---
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "2 Days Out", "Next 48 Hours"], horizontal=True)
     with col2:
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 1.5, 0.5, 0.1)
@@ -70,7 +101,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     status_msg = st.empty()
     
-    # --- DYNAMIC DATE LOGIC ---
+    # Date Logic
     now_utc = datetime.utcnow()
     local_now = now_utc - timedelta(hours=5)
     today_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -78,16 +109,13 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     if horizon == "Today":
         time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         time_to = (today_start_local + timedelta(days=1, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    
     elif horizon == "Tomorrow":
         time_from = (today_start_local + timedelta(days=1, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
         time_to = (today_start_local + timedelta(days=2, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        
     elif horizon == "2 Days Out":
         time_from = (today_start_local + timedelta(days=2, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
         time_to = (today_start_local + timedelta(days=3, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        
-    else: # Next 48 Hours
+    else: 
         time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         time_to = (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
@@ -128,7 +156,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             intel_report = get_ai_intelligence(f"{away_team} vs {home_team}")
                             
-                            is_trap = any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "TRAP", "OUT", "INJURY"])
+                            is_trap = any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "TRAP", "OUT", "INJURY", "BLOCK"])
                             status_emoji = "🔴" if is_trap else "🟢"
                             
                             all_results.append({
