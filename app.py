@@ -13,19 +13,19 @@ try:
     api_key = st.secrets["ODDS_API_KEY"]
     gemini_key = st.secrets["GEMINI_API_KEY"]
 except Exception:
-    st.error("Missing API Keys in Streamlit Secrets! (Need ODDS_API_KEY and GEMINI_API_KEY)")
+    st.error("Missing API Keys in Streamlit Secrets! Ensure ODDS_API_KEY and GEMINI_API_KEY are present.")
     st.stop()
 
 # --- AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
-    """Calls Gemini 1.5 Flash with Google Search to get live injury news."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    """Calls Gemini 2.5 Flash with live Google Search."""
+    # Updated to the stable March 2026 endpoint
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
     
     prompt = f"""
-    Perform a Google Search for the latest injury reports, player rest news, and team fatigue 
-    (like back-to-back games) for this matchup: {matchup}. 
-    Provide a concise 1-sentence summary of the roster health and give a recommendation: 
-    🟢 PLAY if the math edge is supported by news, or 🛑 HARD PASS if injuries make it a trap.
+    Search for latest injury news and roster health for: {matchup}. 
+    Provide a 1-sentence summary and recommendation: 
+    🟢 PLAY if supported by news, or 🛑 HARD PASS if injuries make it a trap.
     """
     
     payload = {
@@ -35,11 +35,16 @@ def get_ai_intelligence(matchup):
     
     try:
         response = requests.post(url, json=payload, timeout=15)
+        if response.status_code != 200:
+            # Captures the specific error from Google (e.g., 403 Forbidden or 429 Quota)
+            error_msg = response.json().get('error', {}).get('message', 'Unknown Error')
+            return f"❌ {response.status_code}: {error_msg[:40]}..."
+        
         result = response.json()
         ai_text = result['candidates'][0]['content']['parts'][0]['text']
         return ai_text.strip()
-    except Exception:
-        return "⚠️ Intelligence Offline (Check API Key)"
+    except Exception as e:
+        return f"⚠️ Connection Error: {str(e)[:30]}"
 
 @st.cache_data(ttl=600)
 def load_opening_data():
@@ -54,7 +59,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     horizon = st.radio("Scan Window:", ["Today Only", "Tomorrow Only", "Next 48 Hours"], horizontal=True)
-    # UPDATED SLIDER: Min 0.5, Max 1.5, Default 0.5
+    # PRECISION SLIDER: 0.5 to 1.5 with 0.1 increments
     min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 1.5, 0.5, 0.1)
 
 with col2:
@@ -104,7 +109,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                     if fd_away is not None and pin_away is not None:
                         edge_val = abs(fd_away - pin_away)
-                        # We use >= min_edge - 0.01 to handle floating point rounding
                         if edge_val >= (min_edge - 0.01):
                             target_team = away_team if fd_away > pin_away else home_team
                             target_line = fd_away if fd_away > pin_away else -fd_away
@@ -121,12 +125,12 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             
-                            # Fetch AI Analysis
                             intel = get_ai_intelligence(f"{away_team} vs {home_team}")
 
                             all_results.append({
                                 "Target": f"🟢 {target_team} {fmt(target_line)}",
                                 "Matchup": f"{away_team} @ {home_team}",
+                                # REORDERED: Start is now right after Matchup
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
                                 "Move": movement_str,
                                 "FD": fmt(fd_away),
@@ -139,6 +143,8 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     if all_results:
         st.success(f"🚨 Found {len(all_results)} targets!")
         df = pd.DataFrame(all_results)
+        # REORDERED COLUMNS
+        df = df[["Target", "Matchup", "Start", "Move", "FD", "PIN", "Edge", "Intelligence"]]
         st.dataframe(
             df, 
             use_container_width=True,
