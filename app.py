@@ -85,4 +85,72 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
         current_utc = datetime.utcnow()
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
-            params = {"apiKey": api_key, "regions": "us,eu", "
+            params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
+            
+            try:
+                response = requests.get(url, params=params).json()
+                for game in response:
+                    game_start_utc = datetime.strptime(game['commence_time'], '%Y-%m-%dT%H:%M:%SZ')
+                    if game_start_utc < current_utc: continue 
+
+                    away_team, home_team = game.get('away_team'), game.get('home_team')
+                    fd_away, pin_away = None, None
+                    for book in game.get('bookmakers', []):
+                        outcomes = book.get('markets', [{}])[0].get('outcomes', [])
+                        for o in outcomes:
+                            if o.get('name') == away_team:
+                                if book['key'] == 'fanduel': fd_away = o.get('point')
+                                elif book['key'] == 'pinnacle': pin_away = o.get('point')
+
+                    if fd_away is not None and pin_away is not None:
+                        edge_val = abs(fd_away - pin_away)
+                        # We use >= min_edge - 0.01 to handle floating point rounding
+                        if edge_val >= (min_edge - 0.01):
+                            target_team = away_team if fd_away > pin_away else home_team
+                            target_line = fd_away if fd_away > pin_away else -fd_away
+                            teams = sorted([away_team, home_team])
+                            matchup_key = f"{teams[0]} vs {teams[1]}"
+                            
+                            movement_str = "No Morning Data"
+                            if not opening_df.empty:
+                                history = opening_df[opening_df['Matchup'] == matchup_key]
+                                if not history.empty:
+                                    total_move = pin_away - history.iloc[0]['Open_Pinnacle']
+                                    recent_move = pin_away - history.iloc[-1]['Open_Pinnacle']
+                                    movement_str = f"{total_move:+.1f} | {recent_move:+.1f}"
+
+                            def fmt(l): return f"+{l}" if l > 0 else f"{l}"
+                            
+                            # Fetch AI Analysis
+                            intel = get_ai_intelligence(f"{away_team} vs {home_team}")
+
+                            all_results.append({
+                                "Target": f"🟢 {target_team} {fmt(target_line)}",
+                                "Matchup": f"{away_team} @ {home_team}",
+                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                                "Move": movement_str,
+                                "FD": fmt(fd_away),
+                                "PIN": fmt(pin_away),
+                                "Edge": f"{edge_val:.1f} pts",
+                                "Intelligence": intel
+                            })
+            except: pass
+
+    if all_results:
+        st.success(f"🚨 Found {len(all_results)} targets!")
+        df = pd.DataFrame(all_results)
+        st.dataframe(
+            df, 
+            use_container_width=True,
+            column_config={
+                "Target": st.column_config.TextColumn(width="small"),
+                "Matchup": st.column_config.TextColumn(width="medium"),
+                "Start": st.column_config.TextColumn(width="small"),
+                "Move": st.column_config.TextColumn(width="small"),
+                "FD": st.column_config.TextColumn(width="small"),
+                "PIN": st.column_config.TextColumn(width="small"),
+                "Edge": st.column_config.TextColumn(width="small"),
+                "Intelligence": st.column_config.TextColumn(width="large")
+            }
+        )
+    else: st.warning(f"No mechanical mismatches found for {horizon}.")
