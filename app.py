@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import os
 
 # 1. Page Configuration
 st.set_page_config(page_title="BANG! Button", page_icon="🎯", layout="wide")
@@ -26,12 +27,9 @@ def get_ai_intelligence(matchup):
         "tools": [{"google_search": {}}],
         "safetySettings": safety_settings 
     }
-    
     try:
-        time.sleep(1.5) # Protect your quota
+        time.sleep(1.5) 
         response = requests.post(url, json=payload, timeout=20).json()
-        if "error" in response:
-            return f"⚠️ API Error: {response['error'].get('message')}"
         candidates = response.get('candidates', [])
         if candidates:
             return candidates[0].get('content', {}).get('parts', [])[0]['text'].strip()
@@ -42,9 +40,19 @@ def get_ai_intelligence(matchup):
 @st.cache_data(ttl=600)
 def load_opening_data():
     try: 
-        return pd.read_csv("opening_lines.csv")
+        df = pd.read_csv("opening_lines.csv")
+        # Get the last modified time of the file to show 'Last Snapshot'
+        mod_time = os.path.getmtime("opening_lines.csv")
+        snapshot_time = datetime.fromtimestamp(mod_time).strftime('%I:%M %p')
+        return df, snapshot_time
     except: 
-        return pd.DataFrame()
+        return pd.DataFrame(), "N/A"
+
+opening_df, last_update = load_opening_data()
+
+# --- TOP STATUS BAR ---
+st.markdown(f"**🕒 Last Snapshot:** {last_update} Central | **📍 Timezone:** Central Time (Des Moines)")
+st.divider()
 
 # 3. AUDIT SETTINGS
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
@@ -59,13 +67,24 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
 
 # 4. Engine
 if st.button("🚀 RUN SCAN", use_container_width=True):
-    opening_df = load_opening_data()
     all_results = []
     status_msg = st.empty()
     
-    now_utc = datetime.utcnow()
-    time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    time_to = (now_utc + timedelta(days=1 if horizon == "Today Only" else 2)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    # --- FIXED DATE LOGIC (Central Time Focus) ---
+    # 1. Define 'Now' in Central Time (UTC-5)
+    local_now = datetime.utcnow() - timedelta(hours=5)
+    # 2. Define 'End of Today' in Central Time (Midnight)
+    today_end_local = (local_now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # 3. Convert these back to UTC strings for the API
+    time_from = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ') # Start from current UTC moment
+    
+    if horizon == "Today Only":
+        # Only scan until the end of the current local day
+        time_to = (today_end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    else:
+        # Scan for the next 48 hours
+        time_to = (datetime.utcnow() + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     with st.spinner("Analyzing Markets..."):
         for name in selected_sports:
@@ -104,7 +123,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             intel_report = get_ai_intelligence(f"{away_team} vs {home_team}")
                             
-                            # Determine Status
                             is_trap = any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "TRAP", "OUT", "INJURY"])
                             status_emoji = "🔴" if is_trap else "🟢"
                             
@@ -133,7 +151,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     s2.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
                     s3.caption(f"**Move**\n{res['Move']}")
                     
-                    # SIMPLE DISPLAY LOGIC (Fixes the broken tile issue)
                     if res['Status'] == "🔴":
                         st.error(f"**Scouting Report:**\n{res['Intel']}")
                     else:
@@ -142,4 +159,4 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             df_display = pd.DataFrame(all_results)[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']]
             st.dataframe(df_display, use_container_width=True, hide_index=True)
     else: 
-        st.warning("No mechanical mismatches found.")
+        st.warning("No mechanical mismatches found for today.")
