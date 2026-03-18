@@ -5,10 +5,10 @@ from datetime import datetime, timedelta
 import time
 import os
 
-# 1. Page Configuration (ONLY ONE CALL ALLOWED - MUST BE FIRST)
+# 1. Page Configuration (This points Chrome to a high-res 💥 icon)
 st.set_page_config(
     page_title="BANG! Button", 
-    page_icon="💥", 
+    page_icon="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f4a5.png", 
     layout="wide"
 )
 
