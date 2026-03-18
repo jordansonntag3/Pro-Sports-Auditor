@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
+import json
 
 # 1. Page Configuration
 st.set_page_config(page_title="Pro Sports Auditor", page_icon="🎯", layout="wide")
@@ -10,22 +11,36 @@ st.title("🎯 BANG! Button")
 # 2. API & Data Loading
 try:
     api_key = st.secrets["ODDS_API_KEY"]
-    # You would add your AI API Key here in Streamlit Secrets
-    # ai_api_key = st.secrets["AI_API_KEY"]
+    gemini_key = st.secrets["GEMINI_API_KEY"]
 except Exception:
-    api_key = "455298a2458c5781e144d28f0f8f97bc"
+    st.error("Missing API Keys in Streamlit Secrets!")
+    st.stop()
 
 # --- NEW: AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
+    """Calls Gemini 1.5 Flash with Google Search to get live injury news."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+    
+    prompt = f"""
+    Perform a Google Search for the latest injury reports, player rest news, and team fatigue 
+    (like back-to-back games) for this matchup: {matchup}. 
+    Provide a concise 1-sentence summary of the roster health and give a recommendation: 
+    🟢 PLAY if the math edge is supported by news, or 🛑 HARD PASS if injuries make it a trap.
     """
-    This is where the API call to a search-enabled AI happens.
-    For now, this is a placeholder. In a live setup, this would 
-    return a real-time summary of injury news.
-    """
-    # Example logic: 
-    # response = requests.post("AI_API_URL", json={"prompt": f"Search injuries for {matchup}..."})
-    return "Click to analyze..." # Placeholder text
-# -------------------------------------
+    
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "tools": [{"google_search_retrieval": {}}] # This triggers the live web search
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=15)
+        result = response.json()
+        # Extracting the text response from Gemini
+        ai_text = result['candidates'][0]['content']['parts'][0]['text']
+        return ai_text.strip()
+    except Exception:
+        return "⚠️ Intelligence Offline (Check API Key)"
 
 @st.cache_data(ttl=600)
 def load_opening_data():
@@ -40,7 +55,7 @@ col1, col2 = st.columns(2)
 
 with col1:
     horizon = st.radio("Scan Window:", ["Today Only", "Tomorrow Only", "Next 48 Hours"], horizontal=True)
-    min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 3.0, 1.0, 0.5)
+    min_edge = st.slider("Min. Discrepancy (Points):", 1.0, 3.0, 1.0, 0.5)
 
 with col2:
     leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NFL": "americanfootball_nfl", "NCAA B": "basketball_ncaab", "NCAA F": "americanfootball_ncaaf"}
@@ -60,7 +75,7 @@ time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 # 5. Engine
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
-    with st.spinner(f"Analyzing {horizon} markets..."):
+    with st.spinner(f"Analyzing {horizon} markets & Fetching Intelligence..."):
         current_utc = datetime.utcnow()
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
@@ -99,35 +114,36 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             
+                            # ONLY CALL AI IF THERE IS A VALID EDGE
+                            intel = get_ai_intelligence(f"{away_team} vs {home_team}")
+
                             all_results.append({
-                                "Target Bet": f"🟢 {target_team} {fmt(target_line)}",
+                                "Target": f"🟢 {target_team} {fmt(target_line)}",
                                 "Matchup": f"{away_team} @ {home_team}",
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Movement": movement_str,
+                                "Move": movement_str,
                                 "FD": fmt(fd_away),
                                 "PIN": fmt(pin_away),
                                 "Edge": f"{edge_val} pts",
-                                "Intelligence": get_ai_intelligence(f"{away_team} vs {home_team}") # AI COLUMN
+                                "Intelligence": intel
                             })
             except: pass
 
     if all_results:
         st.success(f"🚨 Found {len(all_results)} targets!")
         df = pd.DataFrame(all_results)
-        column_order = ["Target Bet", "Matchup", "Start", "Movement", "FD", "PIN", "Edge", "Intelligence"]
-        df = df[column_order]
         st.dataframe(
             df, 
             use_container_width=True,
             column_config={
-                "Target Bet": st.column_config.TextColumn(width="small"),
+                "Target": st.column_config.TextColumn(width="small"),
                 "Matchup": st.column_config.TextColumn(width="medium"),
                 "Start": st.column_config.TextColumn(width="small"),
-                "Movement": st.column_config.TextColumn(width="small"),
+                "Move": st.column_config.TextColumn(width="small"),
                 "FD": st.column_config.TextColumn(width="small"),
                 "PIN": st.column_config.TextColumn(width="small"),
                 "Edge": st.column_config.TextColumn(width="small"),
-                "Intelligence": st.column_config.TextColumn(width="large") # Needs more room
+                "Intelligence": st.column_config.TextColumn(width="large")
             }
         )
     else: st.warning(f"No mechanical mismatches found for {horizon}.")
