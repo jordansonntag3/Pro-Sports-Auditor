@@ -3,13 +3,14 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import time
+import random
 
 # 1. Page Configuration
 st.set_page_config(page_title="BANG! Button", page_icon="🎯", layout="wide")
 st.title("🎯 BANG! Button")
 
 # 2. API & Data Loading
-# We moved this check here so we can give you a clear warning if keys are missing.
 if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
     st.warning("⚠️ Setup Required: Please add 'ODDS_API_KEY' and 'GEMINI_API_KEY' to your Streamlit Secrets.")
     st.stop()
@@ -17,10 +18,11 @@ if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION ---
+# --- OPTIMIZED: AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
-    # Updated to the specific March 2026 Preview ID
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
+    """Calls Gemini with a small 'Patience' delay to prevent Busy errors."""
+    # Using the rock-solid March 2026 stable endpoint
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
     
     prompt = f"""
     Search for latest injury news and roster health for: {matchup}. 
@@ -33,32 +35,34 @@ def get_ai_intelligence(matchup):
         "tools": [{"google_search": {}}] 
     }
     
+    # Add a tiny random delay (0.5 to 1.5 seconds) so we don't spam the API
+    time.sleep(random.uniform(0.5, 1.5))
+    
     try:
-        response = requests.post(url, json=payload, timeout=15)
+        response = requests.post(url, json=payload, timeout=20)
         result = response.json()
         
-        # Safe extraction to prevent 'KeyError'
         candidates = result.get('candidates', [])
         if candidates:
             parts = candidates[0].get('content', {}).get('parts', [])
             if parts and 'text' in parts[0]:
                 return parts[0]['text'].strip()
+            # If the AI was blocked by a safety filter, it will tell us why here
+            elif 'finishReason' in candidates[0]:
+                return f"🛑 Safety Filter: {candidates[0]['finishReason']}"
         
-        return "⚠️ Intelligence Busy (Try again in a moment)"
-    except Exception as e:
-        return "⚠️ Connection Error"
+        return "⚠️ Intelligence Busy (Try scanning again in 10 seconds)"
+    except Exception:
+        return "⚠️ Connection Timed Out"
 
 @st.cache_data(ttl=600)
 def load_opening_data():
-    try: 
-        df = pd.read_csv("opening_lines.csv")
-        return df
-    except: 
-        return pd.DataFrame()
+    try: return pd.read_csv("opening_lines.csv")
+    except: return pd.DataFrame()
 
 opening_df = load_opening_data()
 
-# 3. AUDIT SETTINGS (Moved to Main Page for Mobile visibility)
+# 3. AUDIT SETTINGS (Main Page for Mobile)
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
@@ -83,7 +87,7 @@ time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 # 5. Engine
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
-    with st.spinner("Analyzing Markets..."):
+    with st.spinner("Analyzing Markets & Scouting Injuries..."):
         current_utc = datetime.utcnow()
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
@@ -118,15 +122,13 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                     rec = pin_away - hist.iloc[-1]['Open_Pinnacle']
                                     move_str = f"Tot: {tot:+.1f} | Rec: {rec:+.1f}"
 
-                            def fmt(l): return f"+{l}" if l > 0 else f"{l}"
-                            
                             all_results.append({
-                                "Target": f"{away_team if fd_away > pin_away else home_team} {fmt(fd_away if fd_away > pin_away else -fd_away)}",
+                                "Target": f"{away_team if fd_away > pin_away else home_team} {f'+{fd_away}' if (fd_away if fd_away > pin_away else -fd_away) > 0 else (fd_away if fd_away > pin_away else -fd_away)}",
                                 "Matchup": f"{away_team} @ {home_team}",
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
                                 "Move": move_str,
-                                "FD": fmt(fd_away),
-                                "PIN": fmt(pin_away),
+                                "FD": fd_away,
+                                "PIN": pin_away,
                                 "Edge": f"{edge_val:.1f} pts",
                                 "Intel": get_ai_intelligence(f"{away_team} vs {home_team}")
                             })
@@ -138,7 +140,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             for res in all_results:
                 with st.container(border=True):
                     st.subheader(f"🟢 {res['Target']}")
-                    st.caption(f"🕒 {res['Start']} | Match: {res['Matchup']}")
+                    st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
                     s1, s2, s3 = st.columns(3)
                     s1.metric("Edge", res['Edge'])
                     s2.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
