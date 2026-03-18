@@ -28,8 +28,10 @@ def get_ai_intelligence(matchup):
     }
     
     try:
-        time.sleep(1.5) # Protect Quota
+        time.sleep(1.5) # Protect your quota
         response = requests.post(url, json=payload, timeout=20).json()
+        if "error" in response:
+            return f"⚠️ API Error: {response['error'].get('message')}"
         candidates = response.get('candidates', [])
         if candidates:
             return candidates[0].get('content', {}).get('parts', [])[0]['text'].strip()
@@ -61,7 +63,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     status_msg = st.empty()
     
-    # Date Logic
     now_utc = datetime.utcnow()
     time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
     time_to = (now_utc + timedelta(days=1 if horizon == "Today Only" else 2)).strftime('%Y-%m-%dT%H:%M:%SZ')
@@ -78,7 +79,9 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     away_team, home_team = game.get('away_team'), game.get('home_team')
                     fd_away, pin_away = None, None
                     for book in game.get('bookmakers', []):
-                        outcomes = book.get('markets', [{}])[0].get('outcomes', [])
+                        markets = book.get('markets', [])
+                        if not markets: continue
+                        outcomes = markets[0].get('outcomes', [])
                         for o in outcomes:
                             if o.get('name') == away_team:
                                 if book['key'] == 'fanduel': fd_away = o.get('point')
@@ -101,7 +104,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             intel_report = get_ai_intelligence(f"{away_team} vs {home_team}")
                             
-                            # Determine Red/Green Status
+                            # Determine Status
                             is_trap = any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "TRAP", "OUT", "INJURY"])
                             status_emoji = "🔴" if is_trap else "🟢"
                             
@@ -124,10 +127,19 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             for res in all_results:
                 with st.container(border=True):
                     st.subheader(f"{res['Status']} {res['Target']}")
+                    st.caption(f"🕒 {res['Start']} | Match: {res['Matchup']}")
                     s1, s2, s3 = st.columns(3)
                     s1.metric("Edge", res['Edge'])
                     s2.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
                     s3.caption(f"**Move**\n{res['Move']}")
-                    st.info(res['Intel']) if res['Status'] == "🟢" else st.error(res['Intel'])
+                    
+                    # SIMPLE DISPLAY LOGIC (Fixes the broken tile issue)
+                    if res['Status'] == "🔴":
+                        st.error(f"**Scouting Report:**\n{res['Intel']}")
+                    else:
+                        st.info(f"**Scouting Report:**\n{res['Intel']}")
         else:
-            st.dataframe(pd.DataFrame(all_results)[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']], use_container_width=True, hide_index=True)
+            df_display = pd.DataFrame(all_results)[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']]
+            st.dataframe(df_display, use_container_width=True, hide_index=True)
+    else: 
+        st.warning("No mechanical mismatches found.")
