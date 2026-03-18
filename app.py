@@ -31,8 +31,14 @@ with col1:
     min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 3.0, 1.0, 0.5)
 
 with col2:
-    leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NFL": "americanfootball_nfl"}
-    selected_sports = st.multiselect("Select Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
+    leagues = {
+        "NBA": "basketball_nba", 
+        "NHL": "icehockey_nhl", 
+        "NFL": "americanfootball_nfl",
+        "NCAA B": "basketball_ncaab",
+        "NCAA F": "americanfootball_ncaaf"
+    }
+    selected_sports = st.multiselect("Select Leagues:", list(leagues.keys()), default=["NBA", "NHL", "NCAA B"])
 
 # 4. Date Logic
 local_now = datetime.utcnow() - timedelta(hours=5)
