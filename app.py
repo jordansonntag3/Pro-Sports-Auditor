@@ -1,3 +1,6 @@
+# Change page_icon to the "Collision" emoji (the classic BANG symbol)
+st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
+
 import streamlit as st
 import requests
 import pandas as pd
