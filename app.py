@@ -13,14 +13,14 @@ try:
     api_key = st.secrets["ODDS_API_KEY"]
     gemini_key = st.secrets["GEMINI_API_KEY"]
 except Exception:
-    st.error("Missing API Keys in Streamlit Secrets! (Need ODDS_API_KEY and GEMINI_API_KEY)")
+    st.error("Missing API Keys! Add ODDS_API_KEY and GEMINI_API_KEY to Streamlit Secrets.")
     st.stop()
 
-# --- AI INTELLIGENCE FUNCTION ---
+# --- REVISED: BULLETPROOF AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
-    """Calls Gemini 3 Flash with the 2026 Google Search tool."""
-    # Production endpoint for March 2026
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={gemini_key}"
+    """Calls Gemini 2.5 Flash with live Google Search and robust error handling."""
+    # Using the stable General Availability endpoint for 2026
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={gemini_key}"
     
     prompt = f"""
     Search for latest injury news and roster health for: {matchup}. 
@@ -30,26 +30,34 @@ def get_ai_intelligence(matchup):
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}] # 2026 Standard for live grounding
+        "tools": [{"google_search": {}}] 
     }
     
     try:
         response = requests.post(url, json=payload, timeout=15)
         result = response.json()
 
+        # 1. Handle HTTP Errors (e.g. 403 Forbidden, 400 Bad Request)
         if response.status_code != 200:
-            error_msg = result.get('error', {}).get('message', 'API Error')
-            return f"❌ {response.status_code}: {error_msg[:30]}"
+            error_info = result.get('error', {})
+            return f"❌ {response.status_code}: {error_info.get('message', 'API Error')[:40]}"
 
-        # Safety-first parsing of the AI response
-        if 'candidates' in result and result['candidates']:
-            candidate = result['candidates'][0]
-            if 'content' in candidate and 'parts' in candidate['content']:
-                return candidate['content']['parts'][0]['text'].strip()
-            elif 'finishReason' in candidate:
-                return f"🛑 Blocked: {candidate['finishReason']}"
+        # 2. Safe Parsing (Prevents the 'candidates' KeyError)
+        candidates = result.get('candidates', [])
+        if not candidates:
+            return "⚠️ No analysis (Possible safety block by Google)"
         
-        return "⚠️ No analysis available for this game."
+        # 3. Extract the text response
+        candidate = candidates[0]
+        parts = candidate.get('content', {}).get('parts', [])
+        if parts and 'text' in parts[0]:
+            return parts[0]['text'].strip()
+        
+        # 4. Handle blocked reasons
+        if 'finishReason' in candidate:
+            return f"🛑 Blocked: {candidate['finishReason']}"
+            
+        return "⚠️ Structure Error: No text found."
 
     except Exception as e:
         return f"⚠️ Connection Error: {str(e)[:30]}"
@@ -71,13 +79,7 @@ with col1:
     min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 1.5, 0.5, 0.1)
 
 with col2:
-    leagues = {
-        "NBA": "basketball_nba", 
-        "NHL": "icehockey_nhl", 
-        "NFL": "americanfootball_nfl",
-        "NCAA B": "basketball_ncaab",
-        "NCAA F": "americanfootball_ncaaf"
-    }
+    leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NFL": "americanfootball_nfl", "NCAA B": "basketball_ncaab", "NCAA F": "americanfootball_ncaaf"}
     selected_sports = st.multiselect("Select Leagues:", list(leagues.keys()), default=["NBA", "NHL", "NCAA B"])
 
 # 4. Date Logic
@@ -133,7 +135,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             
-                            # Fetch AI Analysis
+                            # Call the robust Intelligence Scout
                             intel = get_ai_intelligence(f"{away_team} vs {home_team}")
 
                             all_results.append({
