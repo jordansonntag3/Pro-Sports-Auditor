@@ -41,7 +41,6 @@ def get_ai_intelligence(matchup):
 def load_opening_data():
     try: 
         df = pd.read_csv("opening_lines.csv")
-        # Get the last modified time of the file to show 'Last Snapshot'
         mod_time = os.path.getmtime("opening_lines.csv")
         snapshot_time = datetime.fromtimestamp(mod_time).strftime('%I:%M %p')
         return df, snapshot_time
@@ -59,7 +58,8 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
-        horizon = st.radio("Scan Window:", ["Today Only", "Next 48 Hours"], horizontal=True)
+        # --- NEW SCAN WINDOW OPTIONS ---
+        horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "2 Days Out", "Next 48 Hours"], horizontal=True)
     with col2:
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 1.5, 0.5, 0.1)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
@@ -70,21 +70,26 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     status_msg = st.empty()
     
-    # --- FIXED DATE LOGIC (Central Time Focus) ---
-    # 1. Define 'Now' in Central Time (UTC-5)
-    local_now = datetime.utcnow() - timedelta(hours=5)
-    # 2. Define 'End of Today' in Central Time (Midnight)
-    today_end_local = (local_now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    # --- DYNAMIC DATE LOGIC ---
+    now_utc = datetime.utcnow()
+    local_now = now_utc - timedelta(hours=5)
+    today_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
     
-    # 3. Convert these back to UTC strings for the API
-    time_from = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ') # Start from current UTC moment
+    if horizon == "Today":
+        time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_to = (today_start_local + timedelta(days=1, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
     
-    if horizon == "Today Only":
-        # Only scan until the end of the current local day
-        time_to = (today_end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    else:
-        # Scan for the next 48 hours
-        time_to = (datetime.utcnow() + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    elif horizon == "Tomorrow":
+        time_from = (today_start_local + timedelta(days=1, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_to = (today_start_local + timedelta(days=2, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+    elif horizon == "2 Days Out":
+        time_from = (today_start_local + timedelta(days=2, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_to = (today_start_local + timedelta(days=3, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        
+    else: # Next 48 Hours
+        time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_to = (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     with st.spinner("Analyzing Markets..."):
         for name in selected_sports:
@@ -156,7 +161,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     else:
                         st.info(f"**Scouting Report:**\n{res['Intel']}")
         else:
-            df_display = pd.DataFrame(all_results)[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']]
-            st.dataframe(df_display, use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(all_results)[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']], use_container_width=True, hide_index=True)
     else: 
-        st.warning("No mechanical mismatches found for today.")
+        st.warning(f"No mechanical mismatches found for {horizon.lower()}.")
