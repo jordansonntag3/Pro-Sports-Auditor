@@ -58,7 +58,7 @@ time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     with st.spinner(f"Analyzing {horizon} markets..."):
-        current_utc = datetime.utcnow() # Gets the exact time right now
+        current_utc = datetime.utcnow()
         
         for name in selected_sports:
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
@@ -68,12 +68,9 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                 response = requests.get(url, params=params).json()
                 for game in response:
                     
-                    # --- NEW FILTER: HIDE PAST GAMES ---
-                    # Checks if the game has already started. If yes, skip to the next one.
                     game_start_utc = datetime.strptime(game['commence_time'], '%Y-%m-%dT%H:%M:%SZ')
                     if game_start_utc < current_utc:
                         continue 
-                    # -----------------------------------
 
                     away_team = game.get('away_team')
                     home_team = game.get('home_team')
@@ -87,45 +84,60 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                     if fd_away is not None and pin_away is not None:
-                        edge = abs(fd_away - pin_away)
-                        if edge >= min_edge:
+                        edge_val = abs(fd_away - pin_away)
+                        if edge_val >= min_edge:
                             target_team = away_team if fd_away > pin_away else home_team
                             target_line = fd_away if fd_away > pin_away else -fd_away
                             
-                            # Matchup Proofing
                             teams = sorted([away_team, home_team])
                             matchup_key = f"{teams[0]} vs {teams[1]}"
                             
-                            # Historical Ledger Analysis
                             movement_str = "No Morning Data"
                             if not opening_df.empty:
                                 history = opening_df[opening_df['Matchup'] == matchup_key]
                                 if not history.empty:
-                                    true_open = history.iloc[0]['Open_Pinnacle'] # The oldest record
-                                    last_scan = history.iloc[-1]['Open_Pinnacle'] # The most recent record
+                                    true_open = history.iloc[0]['Open_Pinnacle']
+                                    last_scan = history.iloc[-1]['Open_Pinnacle']
                                     
                                     total_move = pin_away - true_open
                                     recent_move = pin_away - last_scan
-                                    
-                                    movement_str = f"Total: {total_move:+.1f} | Recent: {recent_move:+.1f}"
+                                    movement_str = f"{total_move:+.1f} | {recent_move:+.1f}"
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             
                             all_results.append({
                                 "Target Bet": f"🟢 {target_team} {fmt(target_line)}",
                                 "Matchup": f"{away_team} @ {home_team}",
-                                "Movement (PIN)": movement_str,
-                                "FanDuel": fmt(fd_away),
-                                "Pinnacle": fmt(pin_away),
-                                "Edge": f"{edge} pts",
-                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')
+                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                                "Movement": movement_str,
+                                "FD": fmt(fd_away),
+                                "PIN": fmt(pin_away),
+                                "Edge": f"{edge_val} pts"
                             })
             except: pass
 
     if all_results:
         st.success(f"🚨 Found {len(all_results)} targets!")
         df = pd.DataFrame(all_results)
+        
+        # COLUMN REORDERING: Start is now right after Matchup
+        column_order = ["Target Bet", "Matchup", "Start", "Movement", "FD", "PIN", "Edge"]
+        df = df[column_order]
         df.index = df.index + 1
-        st.dataframe(df, use_container_width=True)
+        
+        # SMART SIZING: Shrinks all columns except Matchup
+        st.dataframe(
+            df, 
+            use_container_width=True,
+            column_config={
+                "Target Bet": st.column_config.TextColumn(width="small"),
+                "Matchup": st.column_config.TextColumn(width="medium"),
+                "Start": st.column_config.TextColumn(width="small"),
+                "Movement": st.column_config.TextColumn(width="small"),
+                "FD": st.column_config.TextColumn(width="small"),
+                "PIN": st.column_config.TextColumn(width="small"),
+                "Edge": st.column_config.TextColumn(width="small"),
+            }
+        )
     else:
         st.warning(f"No mechanical mismatches found for {horizon}.")
