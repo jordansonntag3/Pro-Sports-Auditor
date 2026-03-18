@@ -6,7 +6,13 @@ from datetime import datetime, timezone, timedelta
 # 1. Configuration
 API_KEY = os.environ.get("ODDS_API_KEY")
 FILE_NAME = "opening_lines.csv"
-LEAGUES = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NFL": "americanfootball_nfl"}
+LEAGUES = {
+    "NBA": "basketball_nba", 
+    "NHL": "icehockey_nhl", 
+    "NFL": "americanfootball_nfl",
+    "NCAA B": "basketball_ncaab",
+    "NCAA F": "americanfootball_ncaaf"
+}
 
 def fetch_current_snapshot():
     all_results = []
