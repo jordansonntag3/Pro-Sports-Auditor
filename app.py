@@ -3,6 +3,7 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import json
+import time
 
 # 1. Page Configuration
 st.set_page_config(page_title="BANG! Button", page_icon="🎯", layout="wide")
@@ -18,8 +19,17 @@ gemini_key = st.secrets["GEMINI_API_KEY"]
 
 # --- AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
+    # Using the specific March 2026 Preview ID
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
     
+    # Safety settings to prevent sports/gambling false positives
+    safety_settings = [
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
+    ]
+
     prompt = f"""
     Search for latest injury news and roster health for: {matchup}. 
     Provide a 1-sentence summary and recommendation: 
@@ -28,21 +38,34 @@ def get_ai_intelligence(matchup):
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}] 
+        "tools": [{"google_search": {}}],
+        "safetySettings": safety_settings 
     }
     
     try:
-        response = requests.post(url, json=payload, timeout=15)
+        # Prevent Rate Limiting (429 errors)
+        time.sleep(1.5) 
+        
+        response = requests.post(url, json=payload, timeout=20)
         result = response.json()
+        
+        # Check for API-level errors
+        if "error" in result:
+            return f"⚠️ API Error: {result['error'].get('message')}"
+
         candidates = result.get('candidates', [])
         if candidates:
+            # Check if blocked by safety
+            if candidates[0].get('finishReason') == 'SAFETY':
+                return "🛑 Blocked by Safety Filters"
+                
             parts = candidates[0].get('content', {}).get('parts', [])
             if parts and 'text' in parts[0]:
                 return parts[0]['text'].strip()
         
-        return "⚠️ Intelligence Busy (Try again in a moment)"
+        return "⚠️ Intelligence Busy (No response)"
     except Exception as e:
-        return "⚠️ Connection Error"
+        return f"⚠️ Connection Error: {str(e)}"
 
 @st.cache_data(ttl=600)
 def load_opening_data():
@@ -79,9 +102,13 @@ time_to = (end_local + timedelta(hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
 # 5. Engine
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
-    with st.spinner("Analyzing Markets..."):
+    # Status container for progress updates
+    status_msg = st.empty()
+    
+    with st.spinner("Analyzing Markets & Fetching Intelligence..."):
         current_utc = datetime.utcnow()
         for name in selected_sports:
+            status_msg.info(f"Scanning {name}...")
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
             params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
             
@@ -116,10 +143,13 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             
-                            # --- NEW DYNAMIC EMOJI LOGIC ---
+                            # --- DYNAMIC STATUS LOGIC ---
+                            status_msg.info(f"Checking news for {away_team} @ {home_team}...")
                             intel_report = get_ai_intelligence(f"{away_team} vs {home_team}")
-                            # If the report contains the stop sign or 'HARD PASS', set status to Red Dot
-                            status_emoji = "🔴" if "🛑" in intel_report or "HARD PASS" in intel_report.upper() else "🟢"
+                            
+                            # Determine if we use a Red or Green dot
+                            is_hard_pass = "🛑" in intel_report or "HARD PASS" in intel_report.upper()
+                            status_emoji = "🔴" if is_hard_pass else "🟢"
                             
                             all_results.append({
                                 "Status": status_emoji,
@@ -132,25 +162,33 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 "Edge": f"{edge_val:.1f} pts",
                                 "Intel": intel_report
                             })
-            except: pass
+            except Exception as e:
+                st.error(f"Error scanning {name}: {str(e)}")
+
+    status_msg.empty() # Clear the progress message
 
     if all_results:
         st.success(f"🚨 Found {len(all_results)} targets!")
         if view_mode == "Mobile Cards":
             for res in all_results:
                 with st.container(border=True):
-                    # --- DYNAMIC HEADER ---
+                    # Use the Dynamic Status Emoji in the Header
                     st.subheader(f"{res['Status']} {res['Target']}")
                     st.caption(f"🕒 {res['Start']} | Match: {res['Matchup']}")
                     s1, s2, s3 = st.columns(3)
                     s1.metric("Edge", res['Edge'])
                     s2.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
                     s3.caption(f"**Move**\n{res['Move']}")
-                    st.info(f"**Scouting Report:**\n{res['Intel']}")
+                    
+                    # Color the info box red if it's a hard pass
+                    if res['Status'] == "🔴":
+                        st.error(f"**Scouting Report:**\n{res['Intel']}")
+                    else:
+                        st.info(f"**Scouting Report:**\n{res['Intel']}")
         else:
             df = pd.DataFrame(all_results)
-            # Reorder columns to put status first
+            # Reorder columns for the table view
             df = df[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']]
-            st.dataframe(df, use_container_width=True)
+            st.dataframe(df, use_container_width=True, hide_index=True)
     else: 
         st.warning("No mechanical mismatches found. Try lowering the Min. Discrepancy.")
