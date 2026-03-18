@@ -1,6 +1,3 @@
-# Change page_icon to the "Collision" emoji (the classic BANG symbol)
-st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
-
 import streamlit as st
 import requests
 import pandas as pd
@@ -8,9 +5,14 @@ from datetime import datetime, timedelta
 import time
 import os
 
-# 1. Page Configuration
-st.set_page_config(page_title="BANG! Button", page_icon="🎯", layout="wide")
-st.title("🎯 BANG! Button")
+# 1. Page Configuration (ONLY ONE CALL ALLOWED - MUST BE FIRST)
+st.set_page_config(
+    page_title="BANG! Button", 
+    page_icon="💥", 
+    layout="wide"
+)
+
+st.title("💥 BANG! Button")
 
 # 2. Secrets Check
 if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
@@ -20,11 +22,10 @@ if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- UPDATED AI INTELLIGENCE FUNCTION ---
+# --- AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
     
-    # Maximize safety overrides to stop the "Busy" error
     safety_settings = [
         {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
         {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
@@ -44,33 +45,26 @@ def get_ai_intelligence(matchup):
         time.sleep(1.5) # Protect Quota
         response = requests.post(url, json=payload, timeout=20).json()
         
-        # 1. Check for API-level errors (Quota/Key issues)
         if "error" in response:
             msg = response["error"].get("message", "").lower()
             if "quota" in msg: return "🛑 QUOTA EXCEEDED"
             return f"⚠️ API ERROR: {response['error'].get('message')[:50]}"
 
-        # 2. Check for Safety Blocks
         candidates = response.get('candidates', [])
         if not candidates:
             return "🛑 BLOCKED: AI Safety Filter triggered"
 
-        # 3. Check for Search/Finish reasons
         finish_reason = candidates[0].get('finishReason')
         if finish_reason == 'SAFETY':
             return "🛑 BLOCKED: Content Flagged"
-        elif finish_reason == 'RECITATION':
-            return "⚠️ BLOCKED: Copyright Filter"
-
-        # 4. Success Path
+        
         parts = candidates[0].get('content', {}).get('parts', [])
         if parts and 'text' in parts[0]:
             return parts[0]['text'].strip()
             
         return "⚠️ SEARCH FAILED: No info found"
-        
-    except Exception as e:
-        return f"⚠️ CONNECTION ERROR: {str(e)[:30]}"
+    except:
+        return "⚠️ CONNECTION ERROR"
 
 @st.cache_data(ttl=600)
 def load_opening_data():
@@ -104,7 +98,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     status_msg = st.empty()
     
-    # Date Logic
     now_utc = datetime.utcnow()
     local_now = now_utc - timedelta(hours=5)
     today_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
