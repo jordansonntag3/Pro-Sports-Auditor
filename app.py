@@ -67,7 +67,7 @@ def get_ai_intelligence(matchup):
 def load_opening_data():
     # REQUIRED: Replace 'YOUR_USER' and 'YOUR_REPO' with your actual GitHub info
     # If repo is private, ensure you have 'GITHUB_TOKEN' in st.secrets
-    RAW_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/opening_lines.csv"
+    RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
     
     headers = {}
     if "GITHUB_TOKEN" in st.secrets:
