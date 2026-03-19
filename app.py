@@ -4,8 +4,10 @@ import pandas as pd
 from datetime import datetime, timedelta
 import time
 import os
+from io import StringIO
 
-# 1. Page Configuration (This points Chrome to a high-res 💥 icon)
+# 1. Page Configuration (MUST BE FIRST)
+# Points to a high-res icon so Chrome/Android can see it clearly
 st.set_page_config(
     page_title="BANG! Button", 
     page_icon="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f4a5.png", 
@@ -24,6 +26,7 @@ gemini_key = st.secrets["GEMINI_API_KEY"]
 
 # --- AI INTELLIGENCE FUNCTION ---
 def get_ai_intelligence(matchup):
+    # Updated to use the stable 2026 Gemini 3 Flash endpoint
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={gemini_key}"
     
     safety_settings = [
@@ -42,84 +45,90 @@ def get_ai_intelligence(matchup):
     }
     
     try:
-        time.sleep(1.5) # Protect Quota
+        time.sleep(1.2) # Quota protection
         response = requests.post(url, json=payload, timeout=20).json()
         
         if "error" in response:
-            msg = response["error"].get("message", "").lower()
-            if "quota" in msg: return "🛑 QUOTA EXCEEDED"
-            return f"⚠️ API ERROR: {response['error'].get('message')[:50]}"
+            return f"⚠️ API ERROR"
 
         candidates = response.get('candidates', [])
-        if not candidates:
-            return "🛑 BLOCKED: AI Safety Filter triggered"
+        if not candidates: return "🛑 BLOCKED"
 
-        finish_reason = candidates[0].get('finishReason')
-        if finish_reason == 'SAFETY':
-            return "🛑 BLOCKED: Content Flagged"
-        
         parts = candidates[0].get('content', {}).get('parts', [])
         if parts and 'text' in parts[0]:
             return parts[0]['text'].strip()
             
-        return "⚠️ SEARCH FAILED: No info found"
+        return "⚠️ NO INFO"
     except:
         return "⚠️ CONNECTION ERROR"
 
-@st.cache_data(ttl=600)
+# --- LIVE DATA LOADING (THE FIX) ---
+@st.cache_data(ttl=300) # Refreshes every 5 minutes
 def load_opening_data():
+    # REQUIRED: Replace 'YOUR_USER' and 'YOUR_REPO' with your actual GitHub info
+    # If repo is private, ensure you have 'GITHUB_TOKEN' in st.secrets
+    RAW_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/opening_lines.csv"
+    
+    headers = {}
+    if "GITHUB_TOKEN" in st.secrets:
+        headers = {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}"}
+    
     try: 
-        df = pd.read_csv("opening_lines.csv")
-        mod_time = os.path.getmtime("opening_lines.csv")
-        snapshot_time = datetime.fromtimestamp(mod_time).strftime('%I:%M %p')
-        return df, snapshot_time
+        # Cache-busting parameter ensures we don't get an old version
+        response = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
+        if response.status_code == 200:
+            df = pd.read_csv(StringIO(response.text))
+            update_ts = datetime.now().strftime('%I:%M %p')
+            return df, update_ts
+        return pd.DataFrame(), "Fetch Failed"
     except: 
-        return pd.DataFrame(), "N/A"
+        return pd.DataFrame(), "Error"
 
 opening_df, last_update = load_opening_data()
 
 # --- TOP STATUS BAR ---
-st.markdown(f"**🕒 Last Snapshot:** {last_update} Central | **📍 Timezone:** Central Time (Des Moines)")
+st.markdown(f"**🕒 App Sync:** {last_update} | **📍 Region:** Des Moines (Central)")
 st.divider()
 
 # 3. AUDIT SETTINGS
-with st.expander("🛠️ Audit & Display Settings", expanded=True):
+with st.expander("🛠️ Audit & Display Settings", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
-        horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "2 Days Out", "Next 48 Hours"], horizontal=True)
+        horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
     with col2:
-        min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 1.5, 0.5, 0.1)
+        min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
-        selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA", "NCAA B"])
+        selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA"])
 
-# 4. Engine
+# 4. ENGINE
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     status_msg = st.empty()
     
     now_utc = datetime.utcnow()
-    local_now = now_utc - timedelta(hours=5)
-    today_start_local = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Central Time Adjustment
+    time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
     
     if horizon == "Today":
-        time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-        time_to = (today_start_local + timedelta(days=1, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_to = (now_utc + timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M:%SZ')
     elif horizon == "Tomorrow":
-        time_from = (today_start_local + timedelta(days=1, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        time_to = (today_start_local + timedelta(days=2, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    elif horizon == "2 Days Out":
-        time_from = (today_start_local + timedelta(days=2, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        time_to = (today_start_local + timedelta(days=3, hours=5)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        time_to = (now_utc + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M:%SZ')
     else: 
-        time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
         time_to = (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     with st.spinner("Analyzing Markets..."):
         for name in selected_sports:
             status_msg.info(f"Scanning {name}...")
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
-            params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
+            params = {
+                "apiKey": api_key, 
+                "regions": "us,eu", 
+                "markets": "spreads", 
+                "bookmakers": "fanduel,pinnacle", 
+                "commenceTimeFrom": time_from, 
+                "commenceTimeTo": time_to
+            }
             
             try:
                 data = requests.get(url, params=params).json()
@@ -146,13 +155,12 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 hist = opening_df[opening_df['Matchup'] == matchup_key]
                                 if not hist.empty:
                                     tot = pin_away - hist.iloc[0]['Open_Pinnacle']
-                                    rec = pin_away - hist.iloc[-1]['Open_Pinnacle']
-                                    move_str = f"Tot: {tot:+.1f} | Rec: {rec:+.1f}"
+                                    move_str = f"Move: {tot:+.1f} pts"
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             intel_report = get_ai_intelligence(f"{away_team} vs {home_team}")
                             
-                            is_trap = any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "TRAP", "OUT", "INJURY", "BLOCK"])
+                            is_trap = any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "OUT", "INJURY"])
                             status_emoji = "🔴" if is_trap else "🟢"
                             
                             all_results.append({
@@ -174,17 +182,12 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             for res in all_results:
                 with st.container(border=True):
                     st.subheader(f"{res['Status']} {res['Target']}")
-                    st.caption(f"🕒 {res['Start']} | Match: {res['Matchup']}")
-                    s1, s2, s3 = st.columns(3)
-                    s1.metric("Edge", res['Edge'])
-                    s2.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
-                    s3.caption(f"**Move**\n{res['Move']}")
-                    
-                    if res['Status'] == "🔴":
-                        st.error(f"**Scouting Report:**\n{res['Intel']}")
-                    else:
-                        st.info(f"**Scouting Report:**\n{res['Intel']}")
+                    st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
+                    colA, colB = st.columns(2)
+                    colA.metric("Edge", res['Edge'], res['Move'] if "No" not in res['Move'] else None)
+                    colB.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
+                    st.info(f"**Report:** {res['Intel']}")
         else:
-            st.dataframe(pd.DataFrame(all_results)[['Status', 'Target', 'Matchup', 'Start', 'Edge', 'FD', 'PIN', 'Move', 'Intel']], use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(all_results), use_container_width=True, hide_index=True)
     else: 
-        st.warning(f"No mechanical mismatches found for {horizon.lower()}.")
+        st.warning("No discrepancies found.")
