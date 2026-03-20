@@ -26,6 +26,7 @@ with st.sidebar:
     * 🚀 **1.5+**: SMASH PLAY
     * 🟢 **1.0**: STRONG PLAY
     * 🟡 **0.5**: VALUE PLAY
+    * 🔥 **Steam**: Velocity > 1.0
     """)
 
 st.title("💥 BANG! Button")
@@ -52,7 +53,7 @@ def get_ai_intelligence(matchup, _key):
         return parts[0]['text'].strip() if parts else "⚠️ NO INFO FOUND"
     except: return "⚠️ CONNECTION ERROR"
 
-# --- LIVE DATA LOADING (Updated for Local Time) ---
+# --- LIVE DATA LOADING (CST Conversion) ---
 @st.cache_data(ttl=300)
 def load_opening_data():
     RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
@@ -62,25 +63,22 @@ def load_opening_data():
         if resp.status_code == 200:
             df = pd.read_csv(StringIO(resp.text))
             
-            # --- LOCAL TIME CONVERSION ---
+            # CST Local Time Conversion
             file_date = "N/A"
             if not df.empty and 'Recorded_At' in df.columns:
                 try:
-                    # Parse the UTC time from GitHub and shift to Central Time (-5h)
                     utc_dt = pd.to_datetime(df['Recorded_At'].iloc[-1])
                     local_dt = utc_dt - pd.Timedelta(hours=5) 
                     file_date = local_dt.strftime('%m/%d %I:%M %p')
                 except:
                     file_date = df['Recorded_At'].iloc[-1]
-            
             return df, file_date
         return pd.DataFrame(), "File Not Found"
-    except: return pd.DataFrame(), "Connection Error"
+    except: return "Connection Error"
 
 opening_df, csv_timestamp = load_opening_data()
 
-# --- TOP STATUS BAR ---
-st.markdown(f"**🕒 Snapshot Database Updated:** `{csv_timestamp} (Central Time)`")
+st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
 st.divider()
 
 # 4. AUDIT SETTINGS
@@ -117,7 +115,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                 if fd_away is not None and pin_away is not None:
-                    # Determine target team and current edge
                     if fd_away > pin_away:
                         target_team, edge, side = away_t, fd_away - pin_away, "away"
                     else:
@@ -125,18 +122,19 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                     matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
                     
-                    # DRIFT LOGIC
-                    drift_val = 0.0
+                    # VELOCITY LOGIC (Movement since 2:00 AM)
+                    vel_val = 0.0
                     if not opening_df.empty:
                         hist = opening_df[opening_df['Matchup'] == matchup_key]
                         if not hist.empty:
                             pin_open_away = hist.iloc[0]['Open_Pinnacle']
-                            away_drift = pin_away - pin_open_away
-                            drift_val = away_drift if side == "away" else -away_drift
+                            away_move = pin_away - pin_open_away
+                            vel_val = away_move if side == "away" else -away_move
 
-                    # ADDITIVE SCORE MATH (Min. Total of 0.5)
-                    total_score = edge + drift_val
+                    # ADDITIVE SCORE MATH
+                    total_score = edge + vel_val
                     
+                    # FILTER: Only show games with at least 0.5 total confidence
                     if total_score >= 0.49:
                         if total_score >= 1.45:
                             verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
@@ -145,12 +143,14 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                         else:
                             verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
 
+                        steam = " 🔥" if abs(vel_val) >= 0.95 else ""
+                        
                         def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                         new_results.append({
                             "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
                             "Matchup": f"{away_t} @ {home_t}",
                             "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                            "Drift": f"{drift_val:+.1f}",
+                            "Velocity": f"{vel_val:+.1f}{steam}",
                             "Edge": f"{edge:.1f}",
                             "Score": f"{total_score:.1f}",
                             "Verdict": f"{emoji} {verdict}",
@@ -161,20 +161,21 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
 # 6. DISPLAY ENGINE
 if st.session_state.scan_results:
-    st.success(f"🚨 Found {len(st.session_state.scan_results)} high-confidence targets!")
+    st.success(f"🚨 Found {len(st.session_state.scan_results)} High-Confidence Targets")
     for res in st.session_state.scan_results:
         with st.container(border=True):
             st.subheader(f"{res['Target']}")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
             
+            # The Triple Threat Row
             m1, m2, m3 = st.columns(3)
             m1.metric("Current Edge", f"{res['Edge']} pts")
-            m2.metric("2:00 AM Drift", f"{res['Drift']} pts")
-            m3.markdown(f"**Confidence Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
+            m2.metric("Market Velocity", f"{res['Velocity']} pts")
+            m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
             
             if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
                 with st.spinner("Consulting Gemini..."):
                     report = get_ai_intelligence(res['Matchup'], gemini_key)
                     st.info(f"**Report:** {report}")
 else:
-    st.info("No games currently meet the 0.5 Combined Confidence threshold.")
+    st.info("No games meet the 0.5 Confidence Threshold.")
