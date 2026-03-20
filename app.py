@@ -8,7 +8,7 @@ from io import StringIO
 # 1. Page Configuration
 st.set_page_config(
     page_title="BANG! Button", 
-    page_icon="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f4a5.png", 
+    page_icon="💥", 
     layout="wide"
 )
 
@@ -18,7 +18,7 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("Cache Cleared! All old logic wiped.")
+        st.success("Logic & Cache Wiped!")
         st.rerun()
     st.divider()
     st.markdown("""
@@ -27,7 +27,6 @@ with st.sidebar:
     * 🟢 **1.0**: STRONG PLAY
     * 🟡 **0.5**: VALUE PLAY
     """)
-    st.warning("⚠️ HARD FLOOR: Edge must be ≥ 0.5 or the game is hidden.")
 
 st.title("💥 BANG! Button")
 
@@ -48,7 +47,7 @@ def get_ai_intelligence(matchup, _key):
     }
     try:
         response = requests.post(url, json=payload, timeout=20).json()
-        if "error" in response: return "🛑 Quota Full (Resets 2AM)"
+        if "error" in response: return "🛑 Quota Full"
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
         return parts[0]['text'].strip() if parts else "🔍 No fresh news found."
     except: return "⚠️ CONNECTION ERROR"
@@ -89,7 +88,7 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
             "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"
         }
         c1, c2, c3 = st.columns(3)
-        # ALL CHECKED BY DEFAULT NOW
+        # --- ALL CHECKED BY DEFAULT ---
         do_nba = c1.checkbox("NBA", value=True)
         do_nhl = c2.checkbox("NHL", value=True)
         do_ncaab = c3.checkbox("NCAA B", value=True)
@@ -114,7 +113,82 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
         url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
         params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
         
+        # Wrapped try specifically around the API call to fix syntax error
         try:
-            data = requests.get(url, params=params).json()
-            for game in data:
-                away_t, home_t = game.get('away_team'), game.get('home_team')
+            resp = requests.get(url, params=params)
+            data = resp.json()
+        except:
+            continue
+
+        for game in data:
+            away_t = game.get('away_team')
+            home_t = game.get('home_team')
+            fd_away, pin_away = None, None
+            
+            for book in game.get('bookmakers', []):
+                outcomes = book.get('markets', [{}])[0].get('outcomes', [])
+                for o in outcomes:
+                    if o.get('name') == away_t:
+                        if book['key'] == 'fanduel': fd_away = o.get('point')
+                        elif book['key'] == 'pinnacle': pin_away = o.get('point')
+
+            if fd_away is not None and pin_away is not None:
+                if fd_away > pin_away:
+                    target_team, edge, side = away_t, fd_away - pin_away, "away"
+                else:
+                    target_team, edge, side = home_t, pin_away - fd_away, "home"
+
+                # --- THE IRONCLAD FLOOR (RE-VERIFIED) ---
+                if edge < (min_edge - 0.01):
+                    continue
+
+                matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
+                
+                # Velocity Math
+                vel_val = 0.0
+                if not opening_df.empty:
+                    hist = opening_df[opening_df['Matchup'] == matchup_key]
+                    if not hist.empty:
+                        pin_open_away = hist.iloc[0]['Open_Pinnacle']
+                        away_move = pin_away - pin_open_away
+                        vel_val = away_move if side == "away" else -away_move
+
+                total_score = edge + vel_val
+                
+                if total_score >= 0.49:
+                    if total_score >= 1.45: verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
+                    elif total_score >= 0.95: verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
+                    else: verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
+
+                    steam = " 🔥" if abs(vel_val) >= 0.95 else ""
+                    def fmt(l): return f"+{l}" if l > 0 else f"{l}"
+                    
+                    new_results.append({
+                        "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
+                        "Matchup": f"{away_t} @ {home_t}",
+                        "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                        "Velocity": f"{vel_val:+.1f}{steam}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
+                        "Verdict": f"{emoji} {verdict}", "V_Color": v_color
+                    })
+    st.session_state.scan_results = new_results
+
+# 6. DISPLAY ENGINE
+if st.session_state.scan_results:
+    st.success(f"🚨 Found {len(st.session_state.scan_results)} Targets meeting the {min_edge} Edge Floor")
+    for res in st.session_state.scan_results:
+        with st.container(border=True):
+            st.subheader(f"{res['Target']}")
+            st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Current Edge", f"{res['Edge']} pts")
+            m2.metric("Market Velocity", f"{res['Velocity']} pts")
+            m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
+            
+            if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
+                with st.spinner("Analyzing..."):
+                    report = get_ai_intelligence(res['Matchup'], gemini_key)
+                    st.session_state[f"report_{res['Matchup']}"] = report
+            if f"report_{res['Matchup']}" in st.session_state:
+                st.info(f"**Roster Intel:** {st.session_state[f'report_{res['Matchup']}']}")
+else:
+    st.info(f"No games meet the {min_edge} Edge Floor.")
