@@ -22,7 +22,7 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.markdown("""
-    **Scoring Guide:**
+    **Confidence Tiers:**
     * 🚀 **1.5+**: SMASH PLAY
     * 🟢 **1.0**: STRONG PLAY
     * 🟡 **0.5**: VALUE PLAY
@@ -30,7 +30,6 @@ with st.sidebar:
 
 st.title("💥 BANG! Button")
 
-# Persistence for scan results
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
 
@@ -53,7 +52,7 @@ def get_ai_intelligence(matchup, _key):
         return parts[0]['text'].strip() if parts else "⚠️ NO INFO FOUND"
     except: return "⚠️ CONNECTION ERROR"
 
-# --- LIVE DATA LOADING ---
+# --- LIVE DATA LOADING (Updated for Local Time) ---
 @st.cache_data(ttl=300)
 def load_opening_data():
     RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
@@ -62,14 +61,26 @@ def load_opening_data():
         resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
         if resp.status_code == 200:
             df = pd.read_csv(StringIO(resp.text))
-            file_date = df['Recorded_At'].iloc[-1] if not df.empty and 'Recorded_At' in df.columns else "N/A"
+            
+            # --- LOCAL TIME CONVERSION ---
+            file_date = "N/A"
+            if not df.empty and 'Recorded_At' in df.columns:
+                try:
+                    # Parse the UTC time from GitHub and shift to Central Time (-5h)
+                    utc_dt = pd.to_datetime(df['Recorded_At'].iloc[-1])
+                    local_dt = utc_dt - pd.Timedelta(hours=5) 
+                    file_date = local_dt.strftime('%m/%d %I:%M %p')
+                except:
+                    file_date = df['Recorded_At'].iloc[-1]
+            
             return df, file_date
         return pd.DataFrame(), "File Not Found"
     except: return pd.DataFrame(), "Connection Error"
 
 opening_df, csv_timestamp = load_opening_data()
 
-st.markdown(f"**🕒 Snapshot Database Updated:** `{csv_timestamp}`")
+# --- TOP STATUS BAR ---
+st.markdown(f"**🕒 Snapshot Database Updated:** `{csv_timestamp} (Central Time)`")
 st.divider()
 
 # 4. AUDIT SETTINGS
@@ -79,7 +90,6 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
     with col2:
-        # Note: Slider still filters for base edge, but math will further filter
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
         selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
@@ -107,15 +117,11 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                 if fd_away is not None and pin_away is not None:
-                    # Determine which team has the value (higher spread is better for the bettor)
+                    # Determine target team and current edge
                     if fd_away > pin_away:
-                        target_team = away_t
-                        edge = fd_away - pin_away
-                        side = "away"
+                        target_team, edge, side = away_t, fd_away - pin_away, "away"
                     else:
-                        target_team = home_t
-                        edge = pin_away - fd_away # Simplified: Since pin_away is lower, FD home is higher than pin home
-                        side = "home"
+                        target_team, edge, side = home_t, pin_away - fd_away, "home"
 
                     matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
                     
@@ -124,16 +130,14 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     if not opening_df.empty:
                         hist = opening_df[opening_df['Matchup'] == matchup_key]
                         if not hist.empty:
-                            # We calculate if PIN moved in FAVOR of our target team
                             pin_open_away = hist.iloc[0]['Open_Pinnacle']
                             away_drift = pin_away - pin_open_away
                             drift_val = away_drift if side == "away" else -away_drift
 
-                    # ADDITIVE SCORE MATH
+                    # ADDITIVE SCORE MATH (Min. Total of 0.5)
                     total_score = edge + drift_val
                     
-                    # FILTER: Anything below 0.5 is hidden
-                    if total_score >= 0.49: # Account for float rounding
+                    if total_score >= 0.49:
                         if total_score >= 1.45:
                             verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
                         elif total_score >= 0.95:
