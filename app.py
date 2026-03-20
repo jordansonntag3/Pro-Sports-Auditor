@@ -36,9 +36,10 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION (CACHE REMOVED FOR TESTING) ---
+# --- AI INTELLIGENCE FUNCTION (Updated for 2026 Model) ---
 def get_ai_intelligence(matchup, _key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
+    # Updated to Gemini 3 Flash for 2026 compatibility
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
     
     payload = {
         "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
@@ -47,14 +48,11 @@ def get_ai_intelligence(matchup, _key):
     }
     
     try:
-        # We increase timeout to 30s because Search tools can be slow
         response = requests.post(url, json=payload, timeout=30).json()
         
         if "error" in response:
-            err_msg = response["error"].get("message", "").upper()
-            if "QUOTA" in err_msg:
-                return "🛑 API Quota Full: Google is throttling this key/project."
-            return f"⚠️ API Error: {err_msg[:25]}"
+            err = response["error"].get("message", "").upper()
+            return f"🛑 API Error: {err[:25]}"
 
         candidates = response.get('candidates', [{}])
         parts = candidates[0].get('content', {}).get('parts', [])
@@ -62,7 +60,7 @@ def get_ai_intelligence(matchup, _key):
         if parts:
             return parts[0]['text'].strip()
         
-        return "🔍 No fresh injury news found for this matchup."
+        return "🔍 No fresh injury news found."
         
     except Exception as e:
         return f"⚠️ Connection Error: {str(e)[:20]}"
@@ -103,7 +101,7 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
             "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"
         }
         c1, c2, c3 = st.columns(3)
-        # ALL CHECKED BY DEFAULT
+        # ALL BIG 5 CHECKED BY DEFAULT
         do_nba = c1.checkbox("NBA", value=True)
         do_nhl = c2.checkbox("NHL", value=True)
         do_ncaab = c3.checkbox("NCAA B", value=True)
@@ -128,10 +126,15 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
         url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
         params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": t_from, "commenceTimeTo": t_to}
         
+        # 1. Fetch Data
         try:
             resp = requests.get(url, params=params)
             data = resp.json()
-            
+        except:
+            continue
+
+        # 2. Process Games
+        if isinstance(data, list):
             for game in data:
                 away_t, home_t = game.get('away_team'), game.get('home_team')
                 fd_away, pin_away = None, None
@@ -144,12 +147,14 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                 if fd_away is not None and pin_away is not None:
+                    # Logic: Which side has the price advantage?
                     if fd_away > pin_away:
                         target_team, edge, side = away_t, fd_away - pin_away, "away"
                     else:
                         target_team, edge, side = home_t, pin_away - fd_away, "home"
 
-                    # --- THE IRONCLAD FLOOR ---
+                    # --- THE IRONCLAD FLOOR (CRITICAL FIX) ---
+                    # If the physical edge doesn't meet the slider, the game is KILLED here.
                     if edge < (min_edge - 0.01):
                         continue
 
@@ -181,8 +186,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             "Velocity": f"{vel_val:+.1f}{steam}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
                             "Verdict": f"{emoji} {verdict}", "V_Color": v_color
                         })
-        except:
-            continue
             
     st.session_state.scan_results = new_results
 
@@ -199,7 +202,7 @@ if st.session_state.scan_results:
             m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
             
             if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
-                with st.spinner("Talking to Google..."):
+                with st.spinner("Talking to Gemini 3..."):
                     report = get_ai_intelligence(res['Matchup'], gemini_key)
                     st.session_state[f"report_{res['Matchup']}"] = report
             if f"report_{res['Matchup']}" in st.session_state:
