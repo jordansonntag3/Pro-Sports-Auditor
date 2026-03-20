@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import pandas as pd
+import pd
 from datetime import datetime, timedelta
 import time
 from io import StringIO
@@ -28,6 +28,7 @@ with st.sidebar:
     * 🟡 **0.5**: VALUE PLAY
     * 🔥 **Steam**: Velocity ≥ 1.0
     """)
+    st.caption("Hard Floor: Edge must be ≥ 0.5 to show.")
 
 st.title("💥 BANG! Button")
 
@@ -39,7 +40,7 @@ api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
 # --- AI INTELLIGENCE FUNCTION ---
-@st.cache_data(ttl=86400)
+@st.cache_data(ttl=3600) # Reduced TTL to 1 hour to prevent "Quota Full" memory loops
 def get_ai_intelligence(matchup, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
     payload = {
@@ -49,12 +50,11 @@ def get_ai_intelligence(matchup, _key):
     }
     try:
         response = requests.post(url, json=payload, timeout=20).json()
-        
         if "error" in response:
             msg = response["error"].get("message", "").upper()
             if "QUOTA" in msg: return "🛑 Daily Quota Full (Resets 2AM)"
             return f"⚠️ API ERROR: {msg[:15]}"
-
+        
         candidates = response.get('candidates', [{}])
         if candidates and candidates[0].get('finishReason') == 'SAFETY':
             return "🛡️ BLOCKED: Safety filter triggered."
@@ -92,26 +92,20 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     with col_settings_1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-        min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
+        min_edge = st.slider("Min. Price Edge (Floor):", 0.5, 2.0, 0.5, 0.5)
 
     with col_settings_2:
         st.write("**Leagues to Scan:**")
-        # Hardcoded Big 5 Keys
         leagues_master = {
-            "NBA": "basketball_nba", 
-            "NHL": "icehockey_nhl", 
-            "NCAA B": "basketball_ncaab",
-            "NFL": "americanfootball_nfl",
-            "NCAA F": "americanfootball_ncaaf"
+            "NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab",
+            "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"
         }
-        
-        # Grid of checkboxes for easy tapping
         c1, c2, c3 = st.columns(3)
         do_nba = c1.checkbox("NBA", value=True)
         do_nhl = c2.checkbox("NHL", value=True)
         do_ncaab = c3.checkbox("NCAA B", value=True)
-        do_nfl = c1.checkbox("NFL", value=True)
-        do_ncaaf = c2.checkbox("NCAA F", value=True)
+        do_nfl = c1.checkbox("NFL", value=False)
+        do_ncaaf = c2.checkbox("NCAA F", value=False)
         
         selected_keys = []
         if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
@@ -145,7 +139,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                     if fd_away is not None and pin_away is not None:
-                        # Determine target team (where FD is higher than Pinnacle)
                         if fd_away > pin_away:
                             target_team, edge, side = away_t, fd_away - pin_away, "away"
                         else:
@@ -164,8 +157,10 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                         total_score = edge + vel_val
                         
-                        # FILTER: Minimum 0.5 Confidence to Display
-                        if total_score >= 0.49:
+                        # --- THE HARD EDGE FLOOR ---
+                        # 1. Total score must be positive (prevents Traps)
+                        # 2. Physical Edge must meet the slider minimum (prevents "Edge is gone" scenario)
+                        if total_score >= 0.49 and edge >= (min_edge - 0.01):
                             if total_score >= 1.45: verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
                             elif total_score >= 0.95: verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
                             else: verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
@@ -181,17 +176,15 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 "Verdict": f"{emoji} {verdict}", "V_Color": v_color
                             })
             except: pass
-    
     st.session_state.scan_results = new_results
 
 # 6. DISPLAY ENGINE
 if st.session_state.scan_results:
-    st.success(f"🚨 Found {len(st.session_state.scan_results)} High-Confidence Targets")
+    st.success(f"🚨 Found {len(st.session_state.scan_results)} Targets meeting the {min_edge} Edge Floor")
     for res in st.session_state.scan_results:
         with st.container(border=True):
             st.subheader(f"{res['Target']}")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
-            
             m1, m2, m3 = st.columns(3)
             m1.metric("Current Edge", f"{res['Edge']} pts")
             m2.metric("Market Velocity", f"{res['Velocity']} pts")
@@ -201,8 +194,7 @@ if st.session_state.scan_results:
                 with st.spinner("Consulting Gemini..."):
                     report = get_ai_intelligence(res['Matchup'], gemini_key)
                     st.session_state[f"report_{res['Matchup']}"] = report
-            
             if f"report_{res['Matchup']}" in st.session_state:
                 st.info(f"**Roster Intel:** {st.session_state[f'report_{res['Matchup']}']}")
 else:
-    st.info("No games meet the 0.5 Confidence Threshold.")
+    st.info("No games meet the combined confidence and Edge Floor requirements.")
