@@ -18,7 +18,7 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("Global Cache Wiped.")
+        st.success("All Cache Wiped.")
         st.rerun()
     st.divider()
     st.markdown("""
@@ -36,10 +36,10 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION (Updated for 2026 Model) ---
+# --- AI INTELLIGENCE FUNCTION (Corrected Model ID) ---
 def get_ai_intelligence(matchup, _key):
-    # Updated to Gemini 3 Flash for 2026 compatibility
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
+    # Fixed: Added "-preview" to the model name
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
     
     payload = {
         "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
@@ -49,23 +49,14 @@ def get_ai_intelligence(matchup, _key):
     
     try:
         response = requests.post(url, json=payload, timeout=30).json()
-        
         if "error" in response:
             err = response["error"].get("message", "").upper()
             return f"🛑 API Error: {err[:25]}"
+        parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
+        return parts[0]['text'].strip() if parts else "🔍 No news found."
+    except: return "⚠️ CONNECTION ERROR"
 
-        candidates = response.get('candidates', [{}])
-        parts = candidates[0].get('content', {}).get('parts', [])
-        
-        if parts:
-            return parts[0]['text'].strip()
-        
-        return "🔍 No fresh injury news found."
-        
-    except Exception as e:
-        return f"⚠️ Connection Error: {str(e)[:20]}"
-
-# --- LIVE DATA LOADING (CST) ---
+# --- LIVE DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_opening_data():
     RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
@@ -88,13 +79,13 @@ st.divider()
 
 # 4. AUDIT SETTINGS
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
-    c_set1, c_set2 = st.columns([1, 1])
-    with c_set1:
+    col_set1, col_set2 = st.columns([1, 1])
+    with col_set1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_edge = st.slider("Min. Price Edge (Hard Floor):", 0.5, 2.0, 0.5, 0.5)
 
-    with c_set2:
+    with col_set2:
         st.write("**Leagues to Scan:**")
         leagues_master = {
             "NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab",
@@ -126,66 +117,64 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
         url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
         params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": t_from, "commenceTimeTo": t_to}
         
-        # 1. Fetch Data
         try:
             resp = requests.get(url, params=params)
             data = resp.json()
-        except:
-            continue
-
-        # 2. Process Games
-        if isinstance(data, list):
-            for game in data:
-                away_t, home_t = game.get('away_team'), game.get('home_team')
-                fd_away, pin_away = None, None
-                
-                for book in game.get('bookmakers', []):
-                    outcomes = book.get('markets', [{}])[0].get('outcomes', [])
-                    for o in outcomes:
-                        if o.get('name') == away_t:
-                            if book['key'] == 'fanduel': fd_away = o.get('point')
-                            elif book['key'] == 'pinnacle': pin_away = o.get('point')
-
-                if fd_away is not None and pin_away is not None:
-                    # Logic: Which side has the price advantage?
-                    if fd_away > pin_away:
-                        target_team, edge, side = away_t, fd_away - pin_away, "away"
-                    else:
-                        target_team, edge, side = home_t, pin_away - fd_away, "home"
-
-                    # --- THE IRONCLAD FLOOR (CRITICAL FIX) ---
-                    # If the physical edge doesn't meet the slider, the game is KILLED here.
-                    if edge < (min_edge - 0.01):
-                        continue
-
-                    matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
+            
+            # Safety Check: Only process if the API returned a valid list of games
+            if isinstance(data, list):
+                for game in data:
+                    away_t, home_t = game.get('away_team'), game.get('home_team')
+                    fd_away, pin_away = None, None
                     
-                    # Velocity Math
-                    vel_val = 0.0
-                    if not opening_df.empty:
-                        hist = opening_df[opening_df['Matchup'] == matchup_key]
-                        if not hist.empty:
-                            pin_open_away = hist.iloc[0]['Open_Pinnacle']
-                            away_move = pin_away - pin_open_away
-                            vel_val = away_move if side == "away" else -away_move
+                    for book in game.get('bookmakers', []):
+                        outcomes = book.get('markets', [{}])[0].get('outcomes', [])
+                        for o in outcomes:
+                            if o.get('name') == away_t:
+                                if book['key'] == 'fanduel': fd_away = o.get('point')
+                                elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
-                    total_score = edge + vel_val
-                    
-                    if total_score >= 0.49:
-                        if total_score >= 1.45: verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
-                        elif total_score >= 0.95: verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
-                        else: verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
+                    if fd_away is not None and pin_away is not None:
+                        # Determine current edge
+                        if fd_away > pin_away:
+                            target_team, edge, side = away_t, fd_away - pin_away, "away"
+                        else:
+                            target_team, edge, side = home_t, pin_away - fd_away, "home"
 
-                        steam = " 🔥" if abs(vel_val) >= 0.95 else ""
-                        def fmt(l): return f"+{l}" if l > 0 else f"{l}"
+                        # --- THE IRONCLAD FLOOR ---
+                        # Kills the game immediately if edge is below slider setting (0.5 default)
+                        if edge < (min_edge - 0.01):
+                            continue
+
+                        matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
                         
-                        new_results.append({
-                            "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
-                            "Matchup": f"{away_t} @ {home_t}",
-                            "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                            "Velocity": f"{vel_val:+.1f}{steam}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
-                            "Verdict": f"{emoji} {verdict}", "V_Color": v_color
-                        })
+                        # Velocity Math
+                        vel_val = 0.0
+                        if not opening_df.empty:
+                            hist = opening_df[opening_df['Matchup'] == matchup_key]
+                            if not hist.empty:
+                                pin_open_away = hist.iloc[0]['Open_Pinnacle']
+                                away_move = pin_away - pin_open_away
+                                vel_val = away_move if side == "away" else -away_move
+
+                        total_score = edge + vel_val
+                        
+                        if total_score >= 0.49:
+                            if total_score >= 1.45: v_text, v_color, emoji = "SMASH PLAY", "red", "🚀"
+                            elif total_score >= 0.95: v_text, v_color, emoji = "STRONG PLAY", "green", "🟢"
+                            else: v_text, v_color, emoji = "VALUE PLAY", "orange", "🟡"
+
+                            steam = " 🔥" if abs(vel_val) >= 0.95 else ""
+                            def fmt(l): return f"+{l}" if l > 0 else f"{l}"
+                            
+                            new_results.append({
+                                "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
+                                "Matchup": f"{away_t} @ {home_t}",
+                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                                "Velocity": f"{vel_val:+.1f}{steam}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
+                                "Verdict": f"{emoji} {v_text}", "V_Color": v_color
+                            })
+        except: continue
             
     st.session_state.scan_results = new_results
 
@@ -202,7 +191,7 @@ if st.session_state.scan_results:
             m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
             
             if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
-                with st.spinner("Talking to Gemini 3..."):
+                with st.spinner("Talking to Google..."):
                     report = get_ai_intelligence(res['Matchup'], gemini_key)
                     st.session_state[f"report_{res['Matchup']}"] = report
             if f"report_{res['Matchup']}" in st.session_state:
