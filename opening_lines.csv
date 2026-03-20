@@ -1,2 +1,35 @@
 Matchup,Sport,Open_FanDuel,Open_Pinnacle,Start_Time,Recorded_At
-Test Connection,TEST,0,0,2099-01-01T00:00:00Z,NOW
+Test Connection,TEST,0.0,0.0,2099-01-01T00:00:00Z,NOW
+Milwaukee Bucks vs Utah Jazz,NBA,-5.5,-6.0,2026-03-20T01:10:00Z,2026-03-20 00:25:09 UTC
+Philadelphia 76ers vs Sacramento Kings,NBA,-2.5,-2.5,2026-03-20T02:10:00Z,2026-03-20 00:25:09 UTC
+Edmonton Oilers vs Florida Panthers,NHL,1.5,1.5,2026-03-20T01:10:00Z,2026-03-20 00:25:09 UTC
+Buffalo Sabres vs San Jose Sharks,NHL,-1.5,-1.5,2026-03-20T02:10:00Z,2026-03-20 00:25:09 UTC
+Tampa Bay Lightning vs Vancouver Canucks,NHL,-1.5,-1.5,2026-03-20T02:10:00Z,2026-03-20 00:25:09 UTC
+Utah Mammoth vs Vegas Golden Knights,NHL,1.5,1.5,2026-03-20T02:10:00Z,2026-03-20 00:25:09 UTC
+Los Angeles Kings vs Philadelphia Flyers,NHL,1.5,1.5,2026-03-20T02:40:00Z,2026-03-20 00:25:09 UTC
+Carolina Hurricanes vs Toronto Maple Leafs,NHL,-1.5,-1.5,2026-03-20T23:10:00Z,2026-03-20 00:25:09 UTC
+New Jersey Devils vs Washington Capitals,NHL,1.5,1.5,2026-03-20T23:10:00Z,2026-03-20 00:25:09 UTC
+Illinois Fighting Illini vs Pennsylvania Quakers,NCAA B,25.5,25.5,2026-03-20T01:25:00Z,2026-03-20 00:25:09 UTC
+Georgia Bulldogs vs Saint Louis Billikens,NCAA B,2.5,2.0,2026-03-20T01:45:00Z,2026-03-20 00:25:09 UTC
+Gonzaga Bulldogs vs Kennesaw St Owls,NCAA B,19.5,21.0,2026-03-20T02:00:00Z,2026-03-20 00:25:09 UTC
+Houston Cougars vs Idaho Vandals,NCAA B,23.5,24.0,2026-03-20T02:10:00Z,2026-03-20 00:25:09 UTC
+Kentucky Wildcats vs Santa Clara Broncos,NCAA B,3.5,3.0,2026-03-20T16:15:00Z,2026-03-20 00:25:09 UTC
+Akron Zips vs Texas Tech Red Raiders,NCAA B,7.5,8.0,2026-03-20T16:40:00Z,2026-03-20 00:25:09 UTC
+Arizona Wildcats vs LIU Sharks,NCAA B,30.5,31.0,2026-03-20T17:35:00Z,2026-03-20 00:25:09 UTC
+Virginia Cavaliers vs Wright St Raiders,NCAA B,17.5,18.0,2026-03-20T17:50:03Z,2026-03-20 00:25:09 UTC
+Iowa State Cyclones vs Tennessee St Tigers,NCAA B,24.5,24.5,2026-03-20T18:50:00Z,2026-03-20 00:25:09 UTC
+Alabama Crimson Tide vs Hofstra Pride,NCAA B,11.5,12.0,2026-03-20T19:15:56Z,2026-03-20 00:25:09 UTC
+Utah State Aggies vs Villanova Wildcats,NCAA B,-1.5,-2.0,2026-03-20T20:10:00Z,2026-03-20 00:25:09 UTC
+Miami (OH) RedHawks vs Tennessee Volunteers,NCAA B,11.5,11.0,2026-03-20T20:25:38Z,2026-03-20 00:25:09 UTC
+Clemson Tigers vs Iowa Hawkeyes,NCAA B,-2.5,-2.0,2026-03-20T22:50:00Z,2026-03-20 00:25:09 UTC
+Northern Iowa Panthers vs St. John's Red Storm,NCAA B,9.5,10.0,2026-03-20T23:10:00Z,2026-03-20 00:25:09 UTC
+UCF Knights vs UCLA Bruins,NCAA B,5.5,6.0,2026-03-20T23:25:00Z,2026-03-20 00:25:09 UTC
+Purdue Boilermakers vs Queens University Royals,NCAA B,25.5,25.0,2026-03-20T23:35:00Z,2026-03-20 00:25:09 UTC
+Florida Gators vs Prairie View Panthers,NCAA B,35.5,35.5,2026-03-21T01:25:00Z,2026-03-20 00:25:09 UTC
+Cal Baptist Lancers vs Kansas Jayhawks,NCAA B,14.5,14.0,2026-03-21T01:45:00Z,2026-03-20 00:25:09 UTC
+Furman Paladins vs UConn Huskies,NCAA B,20.5,21.0,2026-03-21T02:00:00Z,2026-03-20 00:25:09 UTC
+Miami Hurricanes vs Missouri Tigers,NCAA B,1.5,2.0,2026-03-21T02:10:00Z,2026-03-20 00:25:09 UTC
+Arkansas Razorbacks vs High Point Panthers,NCAA B,11.5,11.0,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
+Duke Blue Devils vs TCU Horned Frogs,NCAA B,10.5,11.0,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
+Louisville Cardinals vs Michigan St Spartans,NCAA B,4.5,4.0,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
+Nebraska Cornhuskers vs Vanderbilt Commodores,NCAA B,-2.5,-2.5,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
