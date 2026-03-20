@@ -12,12 +12,12 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Sidebar Controls (Clear Cache)
+# 2. Sidebar Controls (This is where the Clear Cache button lives)
 with st.sidebar:
     st.header("⚙️ System Controls")
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
-        st.success("Cache Cleared! Re-running...")
+        st.success("Cache Cleared!")
         st.rerun()
 
 st.title("💥 BANG! Button")
@@ -42,7 +42,7 @@ def get_ai_intelligence(matchup, _key):
     }
     
     try:
-        time.sleep(1.5) # Increased to prevent RPM (Minute) limits
+        time.sleep(1.5) # Prevents hitting the 15-requests-per-minute limit
         response = requests.post(url, json=payload, timeout=20).json()
         
         if "error" in response:
@@ -62,14 +62,17 @@ def load_opening_data():
     headers = {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}"} if "GITHUB_TOKEN" in st.secrets else {}
     
     try: 
-        # The ?v= forces GitHub to give us the REAL latest file
         resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
         if resp.status_code == 200:
             df = pd.read_csv(StringIO(resp.text))
-            # Get the date of the newest entry in the CSV
+            
+            # --- DATE FIX: Looking for Recorded_At instead of Timestamp ---
             file_date = "N/A"
-            if not df.empty and 'Timestamp' in df.columns:
-                file_date = df['Timestamp'].iloc[-1]
+            if not df.empty:
+                if 'Recorded_At' in df.columns:
+                    file_date = df['Recorded_At'].iloc[-1]
+                elif 'Timestamp' in df.columns:
+                    file_date = df['Timestamp'].iloc[-1]
             return df, file_date
         return pd.DataFrame(), "File Not Found"
     except: 
@@ -86,7 +89,8 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
-        horizon = st.radio("Scan Window:", ["Today", "Next 48 Hours"], horizontal=True)
+        # RESTORED: Tomorrow and Next 48 Hours
+        horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
     with col2:
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
@@ -100,7 +104,14 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     
     now_utc = datetime.utcnow()
     time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    time_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    
+    # Updated Horizon Logic
+    if horizon == "Today":
+        time_to = (now_utc + timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    elif horizon == "Tomorrow":
+        time_to = (now_utc + timedelta(hours=42)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    else:
+        time_to = (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     with st.spinner("Analyzing Markets..."):
         for name in selected_sports:
@@ -134,7 +145,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             else:
                                 intel = "⏭️ Skipped (Limit Reached)"
 
-                            # MORNING MOVE LOGIC
+                            # DRIFT LOGIC
                             move_val = "MISSING"
                             if not opening_df.empty:
                                 hist = opening_df[opening_df['Matchup'] == matchup_key]
@@ -158,7 +169,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
         for res in all_results:
             with st.container(border=True):
                 st.subheader(f"{res['Status']} {res['Target']}")
-                st.write(f"📊 **2:00 AM Drift:** `{res['Move']}`") # THIS IS THE PERMANENT SPOT
+                st.write(f"📊 **2:00 AM Drift:** `{res['Move']}`")
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
                 colA, colB = st.columns(2)
                 colA.metric("Current Edge", res['Edge'])
