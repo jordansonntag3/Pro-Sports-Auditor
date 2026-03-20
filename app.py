@@ -3,19 +3,26 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import time
-import os
 from io import StringIO
 
-# 1. Page Configuration (MUST BE FIRST)
+# 1. Page Configuration
 st.set_page_config(
     page_title="BANG! Button", 
     page_icon="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f4a5.png", 
     layout="wide"
 )
 
+# 2. Sidebar Controls (Clear Cache)
+with st.sidebar:
+    st.header("⚙️ System Controls")
+    if st.button("🔄 Clear System Cache", use_container_width=True):
+        st.cache_data.clear()
+        st.success("Cache Cleared! Re-running...")
+        st.rerun()
+
 st.title("💥 BANG! Button")
 
-# 2. Secrets Check
+# 3. Secrets Check
 if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
     st.warning("⚠️ Setup Required: Add 'ODDS_API_KEY' and 'GEMINI_API_KEY' to Streamlit Secrets.")
     st.stop()
@@ -23,10 +30,10 @@ if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION (WITH CACHING) ---
-@st.cache_data(ttl=3600) # Remembers results for 1 hour to save your quota
-def get_ai_intelligence(matchup, _gemini_key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_gemini_key}"
+# --- AI INTELLIGENCE FUNCTION ---
+@st.cache_data(ttl=3600)
+def get_ai_intelligence(matchup, _key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
     
     payload = {
         "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
@@ -35,14 +42,12 @@ def get_ai_intelligence(matchup, _gemini_key):
     }
     
     try:
-        # We only sleep if we aren't using a cached result
-        time.sleep(1.2) 
-        response = requests.post(url, json=payload, timeout=15).json()
+        time.sleep(1.5) # Increased to prevent RPM (Minute) limits
+        response = requests.post(url, json=payload, timeout=20).json()
         
         if "error" in response:
-            error_msg = response["error"].get("message", "").upper()
-            if "QUOTA" in error_msg or "429" in str(response):
-                return "QUOTA_EXCEEDED"
+            msg = response["error"].get("message", "").upper()
+            if "QUOTA" in msg or "429" in str(response): return "QUOTA_EXCEEDED"
             return "⚠️ API ERROR"
 
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
@@ -57,39 +62,45 @@ def load_opening_data():
     headers = {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}"} if "GITHUB_TOKEN" in st.secrets else {}
     
     try: 
-        response = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
-        if response.status_code == 200:
-            return pd.read_csv(StringIO(response.text)), datetime.now().strftime('%I:%M %p')
-        return pd.DataFrame(), "Fetch Failed"
+        # The ?v= forces GitHub to give us the REAL latest file
+        resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
+        if resp.status_code == 200:
+            df = pd.read_csv(StringIO(resp.text))
+            # Get the date of the newest entry in the CSV
+            file_date = "N/A"
+            if not df.empty and 'Timestamp' in df.columns:
+                file_date = df['Timestamp'].iloc[-1]
+            return df, file_date
+        return pd.DataFrame(), "File Not Found"
     except: 
-        return pd.DataFrame(), "Error"
+        return pd.DataFrame(), "Connection Error"
 
-opening_df, last_update = load_opening_data()
+opening_df, csv_timestamp = load_opening_data()
 
 # --- TOP STATUS BAR ---
-st.markdown(f"**🕒 App Sync:** {last_update} | **📍 Region:** Des Moines (Central)")
+st.markdown(f"**🕒 Snapshot Database Updated:** `{csv_timestamp}`")
 st.divider()
 
-# 3. AUDIT SETTINGS (FIXED: expanded=True)
+# 4. AUDIT SETTINGS
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
-        horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
+        horizon = st.radio("Scan Window:", ["Today", "Next 48 Hours"], horizontal=True)
     with col2:
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
-        selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA"])
+        selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
 
-# 4. ENGINE
+# 5. ENGINE
 if st.button("🚀 RUN SCAN", use_container_width=True):
     all_results = []
     status_msg = st.empty()
-    ai_blocked = False # Short-circuit if quota is hit
+    ai_blocked = False
     
     now_utc = datetime.utcnow()
     time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    time_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48 if horizon=="Next 48 Hours" else 24)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    time_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     with st.spinner("Analyzing Markets..."):
         for name in selected_sports:
@@ -114,28 +125,30 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                         if edge_val >= (min_edge - 0.01):
                             matchup_key = f"{sorted([away_team, home_team])[0]} vs {sorted([away_team, home_team])[1]}"
                             
-                            # AI LOGIC with Quota Protection
+                            # AI LOGIC
                             if not ai_blocked:
-                                intel_report = get_ai_intelligence(f"{away_team} vs {home_team}", gemini_key)
-                                if intel_report == "QUOTA_EXCEEDED":
+                                intel = get_ai_intelligence(f"{away_team} vs {home_team}", gemini_key)
+                                if intel == "QUOTA_EXCEEDED":
                                     ai_blocked = True
-                                    intel_report = "🛑 Quota Full (Resets 2AM)"
+                                    intel = "🛑 Quota Reached (Resets 2AM)"
                             else:
-                                intel_report = "⏭️ Skipped (Quota Exceeded)"
+                                intel = "⏭️ Skipped (Limit Reached)"
 
-                            move_str = "No Morning Data"
+                            # MORNING MOVE LOGIC
+                            move_val = "MISSING"
                             if not opening_df.empty:
                                 hist = opening_df[opening_df['Matchup'] == matchup_key]
                                 if not hist.empty:
-                                    move_str = f"Move: {pin_away - hist.iloc[0]['Open_Pinnacle']:+.1f} pts"
+                                    diff = pin_away - hist.iloc[0]['Open_Pinnacle']
+                                    move_val = f"{diff:+.1f} pts"
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
                             all_results.append({
-                                "Status": "🔴" if any(x in intel_report.upper() for x in ["🛑", "HARD PASS", "OUT"]) else "🟢",
+                                "Status": "🔴" if any(x in intel.upper() for x in ["🛑", "HARD PASS", "OUT", "INJURY"]) else "🟢",
                                 "Target": f"{away_team if fd_away > pin_away else home_team} {fmt(fd_away if fd_away > pin_away else -fd_away)}",
                                 "Matchup": f"{away_team} @ {home_team}",
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Move": move_str, "FD": fmt(fd_away), "PIN": fmt(pin_away), "Edge": f"{edge_val:.1f} pts", "Intel": intel_report
+                                "Move": move_val, "FD": fmt(fd_away), "PIN": fmt(pin_away), "Edge": f"{edge_val:.1f} pts", "Intel": intel
                             })
             except: pass
 
@@ -145,9 +158,10 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
         for res in all_results:
             with st.container(border=True):
                 st.subheader(f"{res['Status']} {res['Target']}")
+                st.write(f"📊 **2:00 AM Drift:** `{res['Move']}`") # THIS IS THE PERMANENT SPOT
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
                 colA, colB = st.columns(2)
-                colA.metric("Edge", res['Edge'], res['Move'] if "No" not in res['Move'] else None)
+                colA.metric("Current Edge", res['Edge'])
                 colB.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
                 st.info(f"**Report:** {res['Intel']}")
     else: st.warning("No discrepancies found.")
