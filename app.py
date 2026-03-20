@@ -80,7 +80,6 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     with col_settings_1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-        # Min Edge slider now serves as a hard filter in the engine
         min_edge = st.slider("Min. Price Edge (Hard Floor):", 0.5, 2.0, 0.5, 0.5)
 
     with col_settings_2:
@@ -90,11 +89,12 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
             "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"
         }
         c1, c2, c3 = st.columns(3)
+        # ALL CHECKED BY DEFAULT NOW
         do_nba = c1.checkbox("NBA", value=True)
         do_nhl = c2.checkbox("NHL", value=True)
         do_ncaab = c3.checkbox("NCAA B", value=True)
-        do_nfl = c1.checkbox("NFL", value=False)
-        do_ncaaf = c2.checkbox("NCAA F", value=False)
+        do_nfl = c1.checkbox("NFL", value=True)
+        do_ncaaf = c2.checkbox("NCAA F", value=True)
         
         selected_keys = []
         if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
@@ -118,76 +118,3 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             data = requests.get(url, params=params).json()
             for game in data:
                 away_t, home_t = game.get('away_team'), game.get('home_team')
-                fd_away, pin_away = None, None
-                for book in game.get('bookmakers', []):
-                    outcomes = book.get('markets', [{}])[0].get('outcomes', [])
-                    for o in outcomes:
-                        if o.get('name') == away_t:
-                            if book['key'] == 'fanduel': fd_away = o.get('point')
-                            elif book['key'] == 'pinnacle': pin_away = o.get('point')
-
-                if fd_away is not None and pin_away is not None:
-                    # 1. Determine the Edge
-                    if fd_away > pin_away:
-                        target_team, edge, side = away_t, fd_away - pin_away, "away"
-                    else:
-                        target_team, edge, side = home_t, pin_away - fd_away, "home"
-
-                    # --- THE IRONCLAD FLOOR ---
-                    # If the edge is smaller than our slider setting, we ABORT this game immediately.
-                    if edge < (min_edge - 0.01):
-                        continue
-
-                    matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
-                    
-                    # 2. Velocity Math
-                    vel_val = 0.0
-                    if not opening_df.empty:
-                        hist = opening_df[opening_df['Matchup'] == matchup_key]
-                        if not hist.empty:
-                            pin_open_away = hist.iloc[0]['Open_Pinnacle']
-                            away_move = pin_away - pin_open_away
-                            vel_val = away_move if side == "away" else -away_move
-
-                    # 3. Final Scoring
-                    total_score = edge + vel_val
-                    
-                    # Prevent Trap Plays from showing (Negative score)
-                    if total_score >= 0.49:
-                        if total_score >= 1.45: verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
-                        elif total_score >= 0.95: verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
-                        else: verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
-
-                        steam = " 🔥" if abs(vel_val) >= 0.95 else ""
-                        def fmt(l): return f"+{l}" if l > 0 else f"{l}"
-                        
-                        new_results.append({
-                            "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
-                            "Matchup": f"{away_t} @ {home_t}",
-                            "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                            "Velocity": f"{vel_val:+.1f}{steam}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
-                            "Verdict": f"{emoji} {verdict}", "V_Color": v_color
-                        })
-        except: pass
-    st.session_state.scan_results = new_results
-
-# 6. DISPLAY ENGINE
-if st.session_state.scan_results:
-    st.success(f"🚨 Found {len(st.session_state.scan_results)} Targets meeting the {min_edge} Edge Floor")
-    for res in st.session_state.scan_results:
-        with st.container(border=True):
-            st.subheader(f"{res['Target']}")
-            st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Current Edge", f"{res['Edge']} pts")
-            m2.metric("Market Velocity", f"{res['Velocity']} pts")
-            m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
-            
-            if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
-                with st.spinner("Analyzing..."):
-                    report = get_ai_intelligence(res['Matchup'], gemini_key)
-                    st.session_state[f"report_{res['Matchup']}"] = report
-            if f"report_{res['Matchup']}" in st.session_state:
-                st.info(f"**Roster Intel:** {st.session_state[f'report_{res['Matchup']}']}")
-else:
-    st.info(f"No games meet the {min_edge} Edge Floor.")
