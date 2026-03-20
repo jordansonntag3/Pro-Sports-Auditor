@@ -192,6 +192,3 @@ if st.session_state.scan_results:
                 st.info(f"**Roster Intel:** {st.session_state[f'report_{res['Matchup']}']}")
 else:
     st.info(f"No games meet the {min_edge} Edge Floor.")
-
-# TEMPORARY DIAGNOSTIC (Delete after testing)
-st.write(f"DEBUG: Using key ending in... `{st.secrets['GEMINI_API_KEY'][-4:]}`")
