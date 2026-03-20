@@ -17,55 +17,47 @@ with st.sidebar:
     st.header("⚙️ System Controls")
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
-        st.session_state.scan_results = [] # Wipes the current view
+        st.session_state.scan_results = []
         st.success("System Reset!")
         st.rerun()
     st.divider()
-    st.info("Tip: Use 'Analyze' on specific games to save your Google AI quota.")
+    st.markdown("""
+    **Scoring Guide:**
+    * 🚀 **1.5+**: SMASH PLAY
+    * 🟢 **1.0**: STRONG PLAY
+    * 🟡 **0.5**: VALUE PLAY
+    """)
 
 st.title("💥 BANG! Button")
 
-# Initialize Session State for results persistence
+# Persistence for scan results
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
 
 # 3. Secrets Check
-if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
-    st.warning("⚠️ Setup Required: Add 'ODDS_API_KEY' and 'GEMINI_API_KEY' to Streamlit Secrets.")
-    st.stop()
-
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
 # --- AI INTELLIGENCE FUNCTION ---
-@st.cache_data(ttl=86400) # Remember injury reports for 24 hours
+@st.cache_data(ttl=86400)
 def get_ai_intelligence(matchup, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
-    
     payload = {
         "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
         "tools": [{"google_search": {}}],
         "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}] 
     }
-    
     try:
         response = requests.post(url, json=payload, timeout=20).json()
-        if "error" in response:
-            msg = response["error"].get("message", "").upper()
-            if "QUOTA" in msg: return "🛑 Daily Quota Full (Resets 2AM)"
-            return "⚠️ API ERROR"
-
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
         return parts[0]['text'].strip() if parts else "⚠️ NO INFO FOUND"
-    except:
-        return "⚠️ CONNECTION ERROR"
+    except: return "⚠️ CONNECTION ERROR"
 
 # --- LIVE DATA LOADING ---
 @st.cache_data(ttl=300)
 def load_opening_data():
     RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
     headers = {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}"} if "GITHUB_TOKEN" in st.secrets else {}
-    
     try: 
         resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
         if resp.status_code == 200:
@@ -73,12 +65,10 @@ def load_opening_data():
             file_date = df['Recorded_At'].iloc[-1] if not df.empty and 'Recorded_At' in df.columns else "N/A"
             return df, file_date
         return pd.DataFrame(), "File Not Found"
-    except: 
-        return pd.DataFrame(), "Connection Error"
+    except: return pd.DataFrame(), "Connection Error"
 
 opening_df, csv_timestamp = load_opening_data()
 
-# --- TOP STATUS BAR ---
 st.markdown(f"**🕒 Snapshot Database Updated:** `{csv_timestamp}`")
 st.divider()
 
@@ -89,88 +79,98 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
     with col2:
+        # Note: Slider still filters for base edge, but math will further filter
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
         selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
 
-# 5. ENGINE: The Scan Button
+# 5. ENGINE
 if st.button("🚀 RUN SCAN", use_container_width=True):
     new_results = []
-    status_msg = st.empty()
-    
     now_utc = datetime.utcnow()
     time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    if horizon == "Today":
-        time_to = (now_utc + timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    elif horizon == "Tomorrow":
-        time_to = (now_utc + timedelta(hours=42)).strftime('%Y-%m-%dT%H:%M:%SZ')
-    else:
-        time_to = (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    time_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    with st.spinner("Calculating Edges..."):
-        for name in selected_sports:
-            status_msg.info(f"Scanning {name}...")
-            url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
-            params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
-            
-            try:
-                data = requests.get(url, params=params).json()
-                for game in data:
-                    away_team, home_team = game.get('away_team'), game.get('home_team')
-                    fd_away, pin_away = None, None
-                    for book in game.get('bookmakers', []):
-                        outcomes = book.get('markets', [{}])[0].get('outcomes', [])
-                        for o in outcomes:
-                            if o.get('name') == away_team:
-                                if book['key'] == 'fanduel': fd_away = o.get('point')
-                                elif book['key'] == 'pinnacle': pin_away = o.get('point')
+    for name in selected_sports:
+        url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
+        params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
+        try:
+            data = requests.get(url, params=params).json()
+            for game in data:
+                away_t, home_t = game.get('away_team'), game.get('home_team')
+                fd_away, pin_away = None, None
+                for book in game.get('bookmakers', []):
+                    outcomes = book.get('markets', [{}])[0].get('outcomes', [])
+                    for o in outcomes:
+                        if o.get('name') == away_t:
+                            if book['key'] == 'fanduel': fd_away = o.get('point')
+                            elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
-                    if fd_away is not None and pin_away is not None:
-                        edge_val = abs(fd_away - pin_away)
-                        if edge_val >= (min_edge - 0.01):
-                            matchup_key = f"{sorted([away_team, home_team])[0]} vs {sorted([away_team, home_team])[1]}"
-                            
-                            move_val = "MISSING"
-                            if not opening_df.empty:
-                                hist = opening_df[opening_df['Matchup'] == matchup_key]
-                                if not hist.empty:
-                                    move_val = f"{pin_away - hist.iloc[0]['Open_Pinnacle']:+.1f} pts"
+                if fd_away is not None and pin_away is not None:
+                    # Determine which team has the value (higher spread is better for the bettor)
+                    if fd_away > pin_away:
+                        target_team = away_t
+                        edge = fd_away - pin_away
+                        side = "away"
+                    else:
+                        target_team = home_t
+                        edge = pin_away - fd_away # Simplified: Since pin_away is lower, FD home is higher than pin home
+                        side = "home"
 
-                            def fmt(l): return f"+{l}" if l > 0 else f"{l}"
-                            new_results.append({
-                                "Target": f"{away_team if fd_away > pin_away else home_team} {fmt(fd_away if fd_away > pin_away else -fd_away)}",
-                                "Matchup": f"{away_team} @ {home_team}",
-                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Move": move_val, "FD": fmt(fd_away), "PIN": fmt(pin_away), "Edge": f"{edge_val:.1f} pts"
-                            })
-            except: pass
+                    matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
+                    
+                    # DRIFT LOGIC
+                    drift_val = 0.0
+                    if not opening_df.empty:
+                        hist = opening_df[opening_df['Matchup'] == matchup_key]
+                        if not hist.empty:
+                            # We calculate if PIN moved in FAVOR of our target team
+                            pin_open_away = hist.iloc[0]['Open_Pinnacle']
+                            away_drift = pin_away - pin_open_away
+                            drift_val = away_drift if side == "away" else -away_drift
 
-    status_msg.empty()
-    st.session_state.scan_results = new_results # Persist findings
+                    # ADDITIVE SCORE MATH
+                    total_score = edge + drift_val
+                    
+                    # FILTER: Anything below 0.5 is hidden
+                    if total_score >= 0.49: # Account for float rounding
+                        if total_score >= 1.45:
+                            verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
+                        elif total_score >= 0.95:
+                            verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
+                        else:
+                            verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
+
+                        def fmt(l): return f"+{l}" if l > 0 else f"{l}"
+                        new_results.append({
+                            "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
+                            "Matchup": f"{away_t} @ {home_t}",
+                            "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                            "Drift": f"{drift_val:+.1f}",
+                            "Edge": f"{edge:.1f}",
+                            "Score": f"{total_score:.1f}",
+                            "Verdict": f"{emoji} {verdict}",
+                            "V_Color": v_color
+                        })
+        except: pass
+    st.session_state.scan_results = new_results
 
 # 6. DISPLAY ENGINE
 if st.session_state.scan_results:
-    st.success(f"🚨 Found {len(st.session_state.scan_results)} targets!")
-    
-    if view_mode == "Mobile Cards":
-        for res in st.session_state.scan_results:
-            with st.container(border=True):
-                st.subheader(f"{res['Target']}")
-                st.write(f"📊 **2:00 AM Drift:** `{res['Move']}`")
-                st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
-                
-                colA, colB, colC = st.columns([1, 1, 2])
-                colA.metric("Edge", res['Edge'])
-                colB.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
-                
-                # --- INDIVIDUAL INTEL BUTTON ---
-                with colC:
-                    if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
-                        with st.spinner("Consulting Gemini..."):
-                            report = get_ai_intelligence(res['Matchup'], gemini_key)
-                            st.info(f"**Report:** {report}")
-    else:
-        st.dataframe(pd.DataFrame(st.session_state.scan_results), use_container_width=True, hide_index=True)
+    st.success(f"🚨 Found {len(st.session_state.scan_results)} high-confidence targets!")
+    for res in st.session_state.scan_results:
+        with st.container(border=True):
+            st.subheader(f"{res['Target']}")
+            st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
+            
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Current Edge", f"{res['Edge']} pts")
+            m2.metric("2:00 AM Drift", f"{res['Drift']} pts")
+            m3.markdown(f"**Confidence Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
+            
+            if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
+                with st.spinner("Consulting Gemini..."):
+                    report = get_ai_intelligence(res['Matchup'], gemini_key)
+                    st.info(f"**Report:** {report}")
 else:
-    if "scan_results" in st.session_state:
-        st.info("Hit 'Run Scan' to search for market discrepancies.")
+    st.info("No games currently meet the 0.5 Combined Confidence threshold.")
