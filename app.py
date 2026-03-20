@@ -12,7 +12,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Sidebar & Navigation
+# 2. Sidebar & Global Styles
 with st.sidebar:
     st.header("⚙️ System Controls")
     if st.button("🔄 Clear System Cache", use_container_width=True):
@@ -22,123 +22,114 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.markdown("""
-    **Confidence Tiers (Additive):**
+    **Confidence Tiers:**
     * 🚀 **1.5+**: SMASH PLAY
     * 🟢 **1.0**: STRONG PLAY
     * 🟡 **0.5**: VALUE PLAY
     * 🔥 **Steam**: Velocity ≥ 1.0
     """)
-    st.info("Tip: Velocity measures movement since the 4:00 AM snapshot. If the market moves with your edge, the score goes up.")
 
 st.title("💥 BANG! Button")
 
-# Persistent storage for results across button clicks
 if "scan_results" not in st.session_state:
     st.session_state.scan_results = []
 
 # 3. Secrets Check
-if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
-    st.warning("⚠️ Setup Required: Add 'ODDS_API_KEY' and 'GEMINI_API_KEY' to Streamlit Secrets.")
-    st.stop()
-
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION (With Chatty Error Handling) ---
+# --- AI INTELLIGENCE FUNCTION ---
 @st.cache_data(ttl=86400)
 def get_ai_intelligence(matchup, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
-    
     payload = {
         "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
         "tools": [{"google_search": {}}],
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-        ] 
+        "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}] 
     }
-    
     try:
         response = requests.post(url, json=payload, timeout=20).json()
         
-        # Check for hard API errors (Quota, etc.)
         if "error" in response:
             msg = response["error"].get("message", "").upper()
             if "QUOTA" in msg: return "🛑 Daily Quota Full (Resets 2AM)"
-            return f"⚠️ API ERROR: {msg[:20]}"
+            return f"⚠️ API ERROR: {msg[:15]}"
 
-        # Check for Safety Blocks
         candidates = response.get('candidates', [{}])
         if candidates and candidates[0].get('finishReason') == 'SAFETY':
-            return "🛡️ BLOCKED: Google's safety filter hid this report."
-
-        # Check for actual content
+            return "🛡️ BLOCKED: Safety filter triggered."
+        
         parts = candidates[0].get('content', {}).get('parts', [])
-        if parts:
-            return parts[0]['text'].strip()
-        
-        return "🔍 EMPTY: No new news found in the last 24h."
-        
-    except Exception as e:
-        return f"⚠️ CONNECTION ERROR: {str(e)[:20]}"
+        return parts[0]['text'].strip() if parts else "🔍 EMPTY: No news found."
+    except: return "⚠️ CONNECTION ERROR"
 
-# --- LIVE DATA LOADING (CST Conversion) ---
+# --- LIVE DATA LOADING (CST) ---
 @st.cache_data(ttl=300)
 def load_opening_data():
     RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
-    # Use GITHUB_TOKEN if you have it for higher rate limits on private repos
     headers = {"Authorization": f"token {st.secrets['GITHUB_TOKEN']}"} if "GITHUB_TOKEN" in st.secrets else {}
-    
     try: 
         resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
         if resp.status_code == 200:
             df = pd.read_csv(StringIO(resp.text))
-            
-            # CST Local Time Conversion
             file_date = "N/A"
             if not df.empty and 'Recorded_At' in df.columns:
-                try:
-                    utc_dt = pd.to_datetime(df['Recorded_At'].iloc[-1])
-                    local_dt = utc_dt - pd.Timedelta(hours=5) # Shift to CST
-                    file_date = local_dt.strftime('%m/%d %I:%M %p')
-                except:
-                    file_date = df['Recorded_At'].iloc[-1]
+                utc_dt = pd.to_datetime(df['Recorded_At'].iloc[-1])
+                file_date = (utc_dt - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')
             return df, file_date
         return pd.DataFrame(), "File Not Found"
     except: return pd.DataFrame(), "Connection Error"
 
 opening_df, csv_timestamp = load_opening_data()
 
-# --- TOP STATUS BAR ---
 st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
 st.divider()
 
 # 4. AUDIT SETTINGS
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
-    col1, col2 = st.columns(2)
-    with col1:
+    col_settings_1, col_settings_2 = st.columns([1, 1])
+    
+    with col_settings_1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-    with col2:
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
-        leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
-        selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
+
+    with col_settings_2:
+        st.write("**Leagues to Scan:**")
+        # Hardcoded Big 5 Keys
+        leagues_master = {
+            "NBA": "basketball_nba", 
+            "NHL": "icehockey_nhl", 
+            "NCAA B": "basketball_ncaab",
+            "NFL": "americanfootball_nfl",
+            "NCAA F": "americanfootball_ncaaf"
+        }
+        
+        # Grid of checkboxes for easy tapping
+        c1, c2, c3 = st.columns(3)
+        do_nba = c1.checkbox("NBA", value=True)
+        do_nhl = c2.checkbox("NHL", value=True)
+        do_ncaab = c3.checkbox("NCAA B", value=True)
+        do_nfl = c1.checkbox("NFL", value=True)
+        do_ncaaf = c2.checkbox("NCAA F", value=True)
+        
+        selected_keys = []
+        if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
+        if do_nhl: selected_keys.append(("NHL", leagues_master["NHL"]))
+        if do_ncaab: selected_keys.append(("NCAA B", leagues_master["NCAA B"]))
+        if do_nfl: selected_keys.append(("NFL", leagues_master["NFL"]))
+        if do_ncaaf: selected_keys.append(("NCAA F", leagues_master["NCAA F"]))
 
 # 5. ENGINE
 if st.button("🚀 RUN SCAN", use_container_width=True):
     new_results = []
-    status_msg = st.empty()
-    
     now_utc = datetime.utcnow()
     time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
     time_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    with st.spinner("Calculating Velocity..."):
-        for name in selected_sports:
-            status_msg.info(f"Scanning {name}...")
-            url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
+    with st.spinner("Analyzing Market Velocity..."):
+        for display_name, sport_key in selected_keys:
+            url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
             params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": time_from, "commenceTimeTo": time_to}
             
             try:
@@ -154,7 +145,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                     if fd_away is not None and pin_away is not None:
-                        # Determine target team and current edge
+                        # Determine target team (where FD is higher than Pinnacle)
                         if fd_away > pin_away:
                             target_team, edge, side = away_t, fd_away - pin_away, "away"
                         else:
@@ -162,7 +153,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                         matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
                         
-                        # VELOCITY LOGIC (Movement since morning snapshot)
+                        # VELOCITY MATH
                         vel_val = 0.0
                         if not opening_df.empty:
                             hist = opening_df[opening_df['Matchup'] == matchup_key]
@@ -171,33 +162,26 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 away_move = pin_away - pin_open_away
                                 vel_val = away_move if side == "away" else -away_move
 
-                        # ADDITIVE SCORE MATH (Minimum of 0.5 to show)
                         total_score = edge + vel_val
                         
+                        # FILTER: Minimum 0.5 Confidence to Display
                         if total_score >= 0.49:
-                            if total_score >= 1.45:
-                                verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
-                            elif total_score >= 0.95:
-                                verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
-                            else:
-                                verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
+                            if total_score >= 1.45: verdict, v_color, emoji = "SMASH PLAY", "red", "🚀"
+                            elif total_score >= 0.95: verdict, v_color, emoji = "STRONG PLAY", "green", "🟢"
+                            else: verdict, v_color, emoji = "VALUE PLAY", "orange", "🟡"
 
                             steam_icon = " 🔥" if abs(vel_val) >= 0.95 else ""
-                            
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
+                            
                             new_results.append({
                                 "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
                                 "Matchup": f"{away_t} @ {home_t}",
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Velocity": f"{vel_val:+.1f}{steam_icon}",
-                                "Edge": f"{edge:.1f}",
-                                "Score": f"{total_score:.1f}",
-                                "Verdict": f"{emoji} {verdict}",
-                                "V_Color": v_color
+                                "Velocity": f"{vel_val:+.1f}{steam_icon}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
+                                "Verdict": f"{emoji} {verdict}", "V_Color": v_color
                             })
             except: pass
     
-    status_msg.empty()
     st.session_state.scan_results = new_results
 
 # 6. DISPLAY ENGINE
@@ -208,21 +192,17 @@ if st.session_state.scan_results:
             st.subheader(f"{res['Target']}")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
             
-            # The Triple Threat Row
             m1, m2, m3 = st.columns(3)
             m1.metric("Current Edge", f"{res['Edge']} pts")
             m2.metric("Market Velocity", f"{res['Velocity']} pts")
-            m3.markdown(f"**Confidence Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
+            m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
             
-            # Action Row
-            col_btn, col_info = st.columns([1, 2])
-            with col_btn:
-                if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
-                    with st.spinner("Consulting Gemini..."):
-                        report = get_ai_intelligence(res['Matchup'], gemini_key)
-                        st.session_state[f"report_{res['Matchup']}"] = report
+            if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
+                with st.spinner("Consulting Gemini..."):
+                    report = get_ai_intelligence(res['Matchup'], gemini_key)
+                    st.session_state[f"report_{res['Matchup']}"] = report
             
             if f"report_{res['Matchup']}" in st.session_state:
                 st.info(f"**Roster Intel:** {st.session_state[f'report_{res['Matchup']}']}")
 else:
-    st.info("No games currently meet the 0.5 Confidence Threshold.")
+    st.info("No games meet the 0.5 Confidence Threshold.")
