@@ -12,15 +12,22 @@ st.set_page_config(
     layout="wide"
 )
 
-# 2. Sidebar Controls (This is where the Clear Cache button lives)
+# 2. Sidebar Controls
 with st.sidebar:
     st.header("⚙️ System Controls")
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
-        st.success("Cache Cleared!")
+        st.session_state.scan_results = [] # Wipes the current view
+        st.success("System Reset!")
         st.rerun()
+    st.divider()
+    st.info("Tip: Use 'Analyze' on specific games to save your Google AI quota.")
 
 st.title("💥 BANG! Button")
+
+# Initialize Session State for results persistence
+if "scan_results" not in st.session_state:
+    st.session_state.scan_results = []
 
 # 3. Secrets Check
 if "ODDS_API_KEY" not in st.secrets or "GEMINI_API_KEY" not in st.secrets:
@@ -31,7 +38,7 @@ api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
 # --- AI INTELLIGENCE FUNCTION ---
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=86400) # Remember injury reports for 24 hours
 def get_ai_intelligence(matchup, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
     
@@ -42,16 +49,14 @@ def get_ai_intelligence(matchup, _key):
     }
     
     try:
-        time.sleep(1.5) # Prevents hitting the 15-requests-per-minute limit
         response = requests.post(url, json=payload, timeout=20).json()
-        
         if "error" in response:
             msg = response["error"].get("message", "").upper()
-            if "QUOTA" in msg or "429" in str(response): return "QUOTA_EXCEEDED"
+            if "QUOTA" in msg: return "🛑 Daily Quota Full (Resets 2AM)"
             return "⚠️ API ERROR"
 
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
-        return parts[0]['text'].strip() if parts else "⚠️ NO INFO"
+        return parts[0]['text'].strip() if parts else "⚠️ NO INFO FOUND"
     except:
         return "⚠️ CONNECTION ERROR"
 
@@ -65,14 +70,7 @@ def load_opening_data():
         resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
         if resp.status_code == 200:
             df = pd.read_csv(StringIO(resp.text))
-            
-            # --- DATE FIX: Looking for Recorded_At instead of Timestamp ---
-            file_date = "N/A"
-            if not df.empty:
-                if 'Recorded_At' in df.columns:
-                    file_date = df['Recorded_At'].iloc[-1]
-                elif 'Timestamp' in df.columns:
-                    file_date = df['Timestamp'].iloc[-1]
+            file_date = df['Recorded_At'].iloc[-1] if not df.empty and 'Recorded_At' in df.columns else "N/A"
             return df, file_date
         return pd.DataFrame(), "File Not Found"
     except: 
@@ -89,23 +87,19 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col1, col2 = st.columns(2)
     with col1:
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
-        # RESTORED: Tomorrow and Next 48 Hours
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
     with col2:
         min_edge = st.slider("Min. Discrepancy (Points):", 0.5, 2.0, 0.5, 0.5)
         leagues = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab"}
         selected_sports = st.multiselect("Leagues:", list(leagues.keys()), default=["NBA", "NHL"])
 
-# 5. ENGINE
+# 5. ENGINE: The Scan Button
 if st.button("🚀 RUN SCAN", use_container_width=True):
-    all_results = []
+    new_results = []
     status_msg = st.empty()
-    ai_blocked = False
     
     now_utc = datetime.utcnow()
     time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    
-    # Updated Horizon Logic
     if horizon == "Today":
         time_to = (now_utc + timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M:%SZ')
     elif horizon == "Tomorrow":
@@ -113,7 +107,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
     else:
         time_to = (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    with st.spinner("Analyzing Markets..."):
+    with st.spinner("Calculating Edges..."):
         for name in selected_sports:
             status_msg.info(f"Scanning {name}...")
             url = f"https://api.the-odds-api.com/v4/sports/{leagues[name]}/odds/"
@@ -136,43 +130,47 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                         if edge_val >= (min_edge - 0.01):
                             matchup_key = f"{sorted([away_team, home_team])[0]} vs {sorted([away_team, home_team])[1]}"
                             
-                            # AI LOGIC
-                            if not ai_blocked:
-                                intel = get_ai_intelligence(f"{away_team} vs {home_team}", gemini_key)
-                                if intel == "QUOTA_EXCEEDED":
-                                    ai_blocked = True
-                                    intel = "🛑 Quota Reached (Resets 2AM)"
-                            else:
-                                intel = "⏭️ Skipped (Limit Reached)"
-
-                            # DRIFT LOGIC
                             move_val = "MISSING"
                             if not opening_df.empty:
                                 hist = opening_df[opening_df['Matchup'] == matchup_key]
                                 if not hist.empty:
-                                    diff = pin_away - hist.iloc[0]['Open_Pinnacle']
-                                    move_val = f"{diff:+.1f} pts"
+                                    move_val = f"{pin_away - hist.iloc[0]['Open_Pinnacle']:+.1f} pts"
 
                             def fmt(l): return f"+{l}" if l > 0 else f"{l}"
-                            all_results.append({
-                                "Status": "🔴" if any(x in intel.upper() for x in ["🛑", "HARD PASS", "OUT", "INJURY"]) else "🟢",
+                            new_results.append({
                                 "Target": f"{away_team if fd_away > pin_away else home_team} {fmt(fd_away if fd_away > pin_away else -fd_away)}",
                                 "Matchup": f"{away_team} @ {home_team}",
                                 "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Move": move_val, "FD": fmt(fd_away), "PIN": fmt(pin_away), "Edge": f"{edge_val:.1f} pts", "Intel": intel
+                                "Move": move_val, "FD": fmt(fd_away), "PIN": fmt(pin_away), "Edge": f"{edge_val:.1f} pts"
                             })
             except: pass
 
     status_msg.empty()
-    if all_results:
-        st.success(f"🚨 Found {len(all_results)} targets!")
-        for res in all_results:
+    st.session_state.scan_results = new_results # Persist findings
+
+# 6. DISPLAY ENGINE
+if st.session_state.scan_results:
+    st.success(f"🚨 Found {len(st.session_state.scan_results)} targets!")
+    
+    if view_mode == "Mobile Cards":
+        for res in st.session_state.scan_results:
             with st.container(border=True):
-                st.subheader(f"{res['Status']} {res['Target']}")
+                st.subheader(f"{res['Target']}")
                 st.write(f"📊 **2:00 AM Drift:** `{res['Move']}`")
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
-                colA, colB = st.columns(2)
-                colA.metric("Current Edge", res['Edge'])
+                
+                colA, colB, colC = st.columns([1, 1, 2])
+                colA.metric("Edge", res['Edge'])
                 colB.metric("FD/PIN", f"{res['FD']}/{res['PIN']}")
-                st.info(f"**Report:** {res['Intel']}")
-    else: st.warning("No discrepancies found.")
+                
+                # --- INDIVIDUAL INTEL BUTTON ---
+                with colC:
+                    if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
+                        with st.spinner("Consulting Gemini..."):
+                            report = get_ai_intelligence(res['Matchup'], gemini_key)
+                            st.info(f"**Report:** {report}")
+    else:
+        st.dataframe(pd.DataFrame(st.session_state.scan_results), use_container_width=True, hide_index=True)
+else:
+    if "scan_results" in st.session_state:
+        st.info("Hit 'Run Scan' to search for market discrepancies.")
