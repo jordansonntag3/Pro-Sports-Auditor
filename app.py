@@ -39,7 +39,7 @@ gemini_key = st.secrets["GEMINI_API_KEY"]
 # --- AI INTELLIGENCE FUNCTION (Corrected Model ID) ---
 def get_ai_intelligence(matchup, _key):
     # Fixed: Added "-preview" to the model name
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     payload = {
         "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
