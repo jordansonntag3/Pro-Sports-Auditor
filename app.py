@@ -18,6 +18,8 @@ with st.sidebar:
         st.cache_data.clear()
         for key in list(st.session_state.keys()):
             del st.session_state[key]
+        st.success("System Cleared. Re-syncing...")
+        time.sleep(1)
         st.rerun()
         
     st.divider()
@@ -44,9 +46,9 @@ github_token = st.secrets.get("GITHUB_TOKEN")
 # --- UTILITY: ODDS CONVERTER ---
 def to_american(decimal):
     try:
-        decimal = float(decimal)
-        if decimal >= 2.0: return f"+{int((decimal - 1) * 100)}"
-        else: return f"{int(-100 / (decimal - 1))}"
+        val = float(decimal)
+        if val >= 2.0: return f"+{int((val - 1) * 100)}"
+        else: return f"{int(-100 / (val - 1))}"
     except: return str(decimal)
 
 # --- UTILITY: PERMANENT GITHUB LEDGER ---
@@ -109,9 +111,9 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
     
     if mode == "quick":
-        rules = "MAX 2 SENTENCES. End with bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+        rules = "MAX 2 SENTENCES. You MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
     else:
-        rules = "Structure: Roster Audit, Fatigue Spot, Market Verdict. End with bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+        rules = "Structure: Roster Audit, Fatigue Spot, Market Verdict. YOU MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
 
     prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {rules}"
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
@@ -205,7 +207,9 @@ with tab1:
                                     elif mov <= 0.5: vibe = "⚓"
                                 except: pass
 
-                            # Syndicate Alert Logic
+                            # Weighted Sorting (1pt spread = 15 cent ML)
+                            priority = edge if mkt == 'h2h' else edge * 15
+                            
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
                             alert_fingerprint = f"{t_team}_{fd_p}_{name}"
                             if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
@@ -213,9 +217,11 @@ with tab1:
                                 discord_messages.append(f"- {vibe} **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
                                 st.session_state.sent_alerts.add(alert_fingerprint)
 
-                            new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
+                            new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Priority": priority, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
-        st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
+        
+        # Sort by Weighted Priority (Best value across all sports at top)
+        st.session_state.scan_results = sorted(new_res, key=lambda x: x['Priority'], reverse=True)
         if discord_messages: send_discord_live(discord_messages)
 
     if st.session_state.scan_results:
@@ -244,8 +250,7 @@ with tab1:
                         bet_data = {"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Vibe": v, "Units": units}
                         if log_to_github_ledger(bet_data):
                             st.session_state.bet_history.append(bet_data)
-                            st.toast("✅ Saved Permanently!")
-                            time.sleep(0.5); st.rerun()
+                            st.toast("✅ Saved Permanently!"); time.sleep(0.5); st.rerun()
 
                 if q_k in st.session_state: st.info(st.session_state[q_k])
                 if d_k in st.session_state: st.success(st.session_state[d_k])
@@ -255,7 +260,7 @@ with tab2:
     col_a, col_b = st.columns([1, 4])
     if col_a.button("🗑️ DELETE LAST", use_container_width=True):
         if delete_last_from_github_ledger():
-            st.toast("Deleted Last Entry."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
+            st.toast("Deleted."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
             
     if st.session_state.bet_history:
         master_df = pd.DataFrame(st.session_state.bet_history)
