@@ -82,6 +82,15 @@ def send_discord_live(messages):
     if discord_live_url and messages:
         payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
         requests.post(discord_live_url, json=payload)
+        
+# --- UTILITY: DECIMAL TO AMERICAN ODDS ---
+def to_american(decimal):
+    if decimal >= 2.0:
+        return f"+{int((decimal - 1) * 100)}"
+    else:
+        return f"{int(-100 / (decimal - 1))}"
+
+
 
 # --- MASTER INTELLIGENCE (Verdict Enforcement Edition) ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
@@ -189,7 +198,10 @@ with tab1:
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
                             alert_fingerprint = f"{t_team}_{fd_p}_{name}"
                             if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
-                                line_str = f"{'+' if mkt=='spreads' and fd_p > 0 else ''}{fd_p}"
+                                if mkt == 'h2h':
+                                    line_str = to_american(fd_p)
+                                else:
+                                    line_str = f"{'+' if fd_p > 0 else ''}{fd_p}"
                                 discord_messages.append(f"- {vibe} **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
                                 st.session_state.sent_alerts.add(alert_fingerprint)
 
@@ -202,7 +214,9 @@ with tab1:
         for res in st.session_state.scan_results:
             with st.container(border=True):
                 v = res.get('Vibe', '🌊')
-                h = f"{v} {res['Target']} ({res['FD']})"
+         # Create a clean display version of the price
+                display_price = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
+                h = f"{v} {res['Target']} ({display_price})"
                 st.subheader(h)
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
                 c1, c2 = st.columns(2)
