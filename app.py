@@ -34,24 +34,27 @@ gemini_key = st.secrets["GEMINI_API_KEY"]
 
 # --- AI INTELLIGENCE (The "Anchored" Price Audit) ---
 def get_forensic_audit(matchup, target_team, fd_price, pin_price, edge, velocity, _key):
+    # Using Lite for 1,000 RPD quota stability
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
-    # NEW: We pass the EXACT prices into the prompt so the AI can't hallucinate the consensus.
     prompt = f"""
     PRICE INTEGRITY AUDIT: {matchup}
-    FANDUEL: {target_team} {fd_price}
-    PINNACLE: {target_team} {pin_price}
-    MATH EDGE: {edge} pts | VELOCITY: {velocity} pts
+    DATE: March 20, 2026
     
-    You are a Quantitative Market Analyst. 
-    FACT: FanDuel is offering {edge} points of value compared to Pinnacle's sharp line.
+    LIVE MARKET DATA (Source of Truth):
+    - FANDUEL: {target_team} {fd_price}
+    - PINNACLE: {target_team} {pin_price}
+    - CURRENT EDGE: {edge} points of value at FanDuel.
     
-    1. NEWS ANCHOR: Search for news (injuries/lineups) for March 20, 2026. Does news explain why Pinnacle is at {pin_price} while FanDuel is still at {fd_price}?
-    2. SPREAD INTEGRITY: Analyze the value of this specific {edge}-point 'hook'. Is the 0.5-1.0 point difference a true book inefficiency or just a 'news lag'?
-    3. MARKET FLOOR: Is Pinnacle's {pin_price} stable, or is the market still moving away from this number?
+    TASK: You are a Quantitative Market Analyst. 
+    CRITICAL: Do not use Google Search to find current lines. Use the LIVE MARKET DATA above as the absolute truth. Use Google Search ONLY to find the 'News Anchor' (the reason the market is moving).
+    
+    1. NEWS ANCHOR: Search for roster news for {matchup} today. Does the news explain why Pinnacle is at {pin_price}?
+    2. PRICE OUTLIER: Since FanDuel is giving a {edge}-point advantage at {fd_price}, is this a 'lazy book' lag or a 'news trap'?
+    3. MARKET FLOOR: Based on the news, is the Pinnacle price of {pin_price} likely the 'final' number, or is the market still crashing?
     
     FINAL SIGNAL: 🟢 PURE VALUE, 🟡 CAUTION, or 🔴 STALE.
-    Be cold and analytical. Do not discuss team 'strength'—only the price mismatch.
+    Be concise, cold, and strictly focused on the spread math.
     """
     
     payload = {
@@ -134,8 +137,12 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             fd_p, pin_p = fd_away, pin_away
                         else:
                             t_team, edge, side = home_t, pin_away - fd_away, "home"
-                            # Point check for home teams (usually negative)
-                            fd_p, pin_p = -fd_away, -pin_away
+                            fd_p, pin_p = fd_away if side=="away" else -fd_away, pin_away if side=="away" else -pin_away
+                            # Correction for display logic:
+                            if side == "home":
+                                fd_p, pin_p = outcomes_p = [o.get('point') for book in game['bookmakers'] for o in book['markets'][0]['outcomes'] if o['name'] == home_t]
+                                fd_p = next(o.get('point') for b in game['bookmakers'] if b['key']=='fanduel' for o in b['markets'][0]['outcomes'] if o['name'] == home_t)
+                                pin_p = next(o.get('point') for b in game['bookmakers'] if b['key']=='pinnacle' for o in b['markets'][0]['outcomes'] if o['name'] == home_t)
 
                         if edge < (min_edge - 0.01): continue
                         
@@ -172,12 +179,11 @@ if st.session_state.scan_results:
             
             if st.button(f"🔎 Run Price Audit", key=f"intel_{res['Matchup']}"):
                 with st.spinner("Analyzing Market Alignment..."):
-                    # PASSING FD AND PIN PRICES DIRECTLY TO AI
                     audit = get_forensic_audit(res['Matchup'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], res['Vel_Raw'], gemini_key)
                     st.session_state[f"audit_{res['Matchup']}"] = audit
             
-            if f"audit_{res['audit_' + res['Matchup']]}" in st.session_state or f"audit_{res['Matchup']}" in st.session_state:
+            if f"audit_{res['Matchup']}" in st.session_state:
                 st.markdown("### 🕵️ Price Integrity Audit")
-                st.write(st.session_state.get(f"audit_{res['Matchup']}", "Audit Pending..."))
+                st.write(st.session_state[f"audit_{res['Matchup']}"])
 else:
     st.info(f"No games meet the {min_edge} Edge requirement.")
