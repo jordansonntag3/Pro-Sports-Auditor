@@ -14,14 +14,14 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("Logic & Cache Wiped!")
+        st.success("Global Cache Wiped.")
         st.rerun()
     st.divider()
     st.markdown("""
     **Signal Strength Definitions:**
-    * 🟢 **PURE VALUE**: Stable market, FanDuel is simply lagging.
-    * 🟡 **CAUTION**: News is fresh, line is moving, edge is thin.
-    * 🔴 **STALE / TRAP**: Line is crashing; news is worse than the points.
+    * 🟢 **PURE VALUE**: FD is a price outlier on a stable market.
+    * 🟡 **CAUTION**: News is fresh; FD is likely in the process of moving.
+    * 🔴 **STALE / TRAP**: The market has moved; the edge is a 'falling knife'.
     """)
 
 st.title("💥 BANG! Button")
@@ -32,22 +32,25 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE (The 3-Question Forensic Audit) ---
+# --- AI INTELLIGENCE (The Price Integrity Audit) ---
 def get_forensic_audit(matchup, target_team, edge, velocity, _key):
-    # Using the Lite model for high-quota stability as discussed
+    # Using Lite for 1,000 RPD quota stability
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     prompt = f"""
-    MARKET AUDIT: {matchup}
+    PRICE INTEGRITY AUDIT: {matchup}
     TARGET: {target_team} | MATH EDGE: {edge} pts | VELOCITY: {velocity} pts
+    DATE: March 20, 2026
     
-    As a professional market analyst for March 20, 2026, answer these 3 questions:
-    1. NEWS ANCHOR: What specific news (injuries, rest, or sharp action) is driving the {velocity} point move?
-    2. VALUE INTEGRITY: Does the {edge} point math edge actually compensate for the roster news found in #1?
-    3. MARKET FLOOR: Is this line stable at FanDuel's current price, or is it still 'accelerating' (crashing) toward a new price?
+    You are a Quantitative Market Analyst. DO NOT explain why a team is 'good' or 'better'. 
+    Focus ONLY on the Spread Price Efficiency.
+    
+    1. NEWS ANCHOR: Search for news (injuries/lineups) for today. Does news justify why FanDuel is {edge} pts away from Pinnacle?
+    2. SPREAD INTEGRITY: Is FanDuel's price a 'Market Outlier'? (e.g., if FD is at +14.5 and the consensus/Pinnacle is +13.5, analyze the mathematical value of that 1.0 point cushion).
+    3. MARKET FLOOR: Is the price stable at Pinnacle ('The Sharp Standard'), or is the line 'accelerating' toward a new number?
     
     FINAL SIGNAL: Categorize as 🟢 PURE VALUE, 🟡 CAUTION, or 🔴 STALE/TRAP.
-    Format your response as a clean bulleted list. Be concise.
+    Format as a concise bulleted list. Be cold, analytical, and math-focused.
     """
     
     payload = {
@@ -93,8 +96,11 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         leagues_master = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
         c1, c2, c3 = st.columns(3)
         # ALL CHECKED BY DEFAULT
-        do_nba, do_nhl, do_ncaab = c1.checkbox("NBA", value=True), c2.checkbox("NHL", value=True), c3.checkbox("NCAA B", value=True)
-        do_nfl, do_ncaaf = c1.checkbox("NFL", value=True), c2.checkbox("NCAA F", value=True)
+        do_nba = c1.checkbox("NBA", value=True)
+        do_nhl = c2.checkbox("NHL", value=True)
+        do_ncaab = c3.checkbox("NCAA B", value=True)
+        do_nfl = c1.checkbox("NFL", value=True)
+        do_ncaaf = c2.checkbox("NCAA F", value=True)
         
         selected_keys = []
         if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
@@ -127,6 +133,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                     if fd_away is not None and pin_away is not None:
                         t_team, edge, side = (away_t, fd_away - pin_away, "away") if fd_away > pin_away else (home_t, pin_away - fd_away, "home")
+                        # --- THE IRONCLAD FLOOR ---
                         if edge < (min_edge - 0.01): continue
                         
                         m_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
@@ -159,13 +166,13 @@ if st.session_state.scan_results:
             m2.metric("Market Velocity", f"{res['Velocity']} pts")
             m3.metric("Combined Score", f"{res['Score']}")
             
-            if st.button(f"🔎 Run Forensic Audit", key=f"intel_{res['Matchup']}"):
+            if st.button(f"🔎 Run Price Audit", key=f"intel_{res['Matchup']}"):
                 with st.spinner("Analyzing Market Alignment..."):
                     audit = get_forensic_audit(res['Matchup'], res['Target_Raw'], res['Edge_Raw'], res['Vel_Raw'], gemini_key)
                     st.session_state[f"audit_{res['Matchup']}"] = audit
             
             if f"audit_{res['Matchup']}" in st.session_state:
-                st.markdown("### 🕵️ Intelligence Audit")
+                st.markdown("### 🕵️ Price Integrity Audit")
                 st.write(st.session_state[f"audit_{res['Matchup']}"])
 else:
     st.info(f"No games meet the {min_edge} Edge requirement.")
