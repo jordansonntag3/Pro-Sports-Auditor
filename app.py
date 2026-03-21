@@ -18,11 +18,10 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.markdown("""
-    **Intel Audit Framework:**
-    * 🔍 **THE CATALYST**: The 1-sentence 'Why'.
-    * 🌊 **THE VIBE**: Market Stability Check.
-    * 📊 **THE SCORECARD**: Replacement-Level Math.
-    * 🧠 **GEMINI'S ANALYSIS**: Tactical Strategic Deep Dive.
+    **The Strategic Framework:**
+    * 🔍 **CATALYST**: The 1-sentence 'Why'.
+    * 📊 **SCORECARD**: Star vs. Replacement Math.
+    * 🧠 **GEMINI'S ANALYSIS**: Tactical Synthesis.
     """)
 
 st.title("💥 BANG! Button")
@@ -33,33 +32,38 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE (The Strategic Deep Dive) ---
-def get_intel_audit(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key):
+# --- AI INTELLIGENCE (The Dual-Speed Audit) ---
+def get_intel_audit(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     edge_label = "points" if market_type == "spreads" else "cents (Price Gap)"
     
+    # Mode-Specific Constraints
+    if mode == "quick":
+        constraint = "STRICT: Provide only 1-2 concise sentences for each pillar. No fluff."
+    else:
+        constraint = "STRICT: Provide a massive, high-conviction deep dive for Pillar 4. Be tactical and bracket-style."
+
     prompt = f"""
-    INTEL AUDIT: {matchup} ({sport})
+    INTEL AUDIT ({mode.upper()}): {matchup} ({sport})
     MARKET: {market_type} | TARGET: {target_team} {fd_p} (vs Pinnacle {pin_p})
     MATH EDGE: {edge} {edge_label}
     DATE: March 21, 2026
     
-    You are a Strategic Betting Analyst. Provide a deep-dive audit using these 4 pillars:
+    {constraint}
     
     1. THE CATALYST: Identify the specific injury or roster move driving this market today.
     2. THE VIBE: Is the market 'Stable' (priced in) or 'Fluid' (active move/crashing)?
     3. THE SCORECARD: Identify the star player out and their LIKELY REPLACEMENT. 
        Calculate the 'Production Gap' using volume metrics:
        - NBA/NCAA B: Usage Rate & PPG.
-       - NHL: Shots on Goal (SOG) & Time on Ice (TOI).
+       - NHL: Shots on Goal (SOG) & TOI.
        - NFL/NCAA F: EPA per Play (QBs) or Targets/Air Yards (Skill).
-       Compare Star vs. Replacement stats to show the 'hole' in the rotation.
-    4. GEMINI'S ANALYSIS: Perform a high-conviction strategic deep dive. Analyze the spread/price 
-       vs the roster reality. Does the {edge} {edge_label} edge cover the 'Production Gap' 
-       found in Pillar 3? Breakdown the coaching, depth, and situational edge like a tournament bracket analysis.
+       Compare Star vs. Replacement stats.
+    4. GEMINI'S ANALYSIS: Analyze the {edge} {edge_label} edge vs the 'Production Gap'. 
+       In 'Detailed' mode, provide a bracket-style breakdown of coaching, depth, and situational edge.
     
-    Be cold, analytical, and highly detailed in Pillar 4.
+    Format as 4 clear sections.
     """
     
     payload = {
@@ -93,13 +97,12 @@ opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
 st.divider()
 
-# 4. AUDIT SETTINGS (Specialized Markets & 10-Cent Base)
+# 4. AUDIT SETTINGS
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_set1, col_set2 = st.columns([1, 1])
     with col_set1:
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min. Spread Edge (Points):", 0.5, 2.0, 0.5, 0.5)
-        # 10 cents is now the base (Min and Default)
         min_ml_edge = st.slider("Min. NHL Moneyline Edge (Cents):", 10, 50, 10, 5)
     with col_set2:
         st.write("**Leagues & Specialized Markets:**")
@@ -147,17 +150,13 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
                                 elif b['key'] == 'pinnacle': pin_h = p
 
                     if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
-                        if conf['market'] == 'spreads':
-                            edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
-                            floor = min_pt_edge - 0.01
-                        else: # Moneyline (Price Cents)
-                            edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
-                            floor = min_ml_edge - 0.01
+                        edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
+                        floor = (min_pt_edge if conf['market'] == 'spreads' else min_ml_edge) - 0.01
 
                         if edge_a > edge_h and edge_a >= floor:
-                            t_team, edge, side, fd_p, pin_p = away_t, edge_a, "away", fd_a, pin_a
+                            t_team, edge, fd_p, pin_p = away_t, edge_a, fd_a, pin_a
                         elif edge_h >= floor:
-                            t_team, edge, side, fd_p, pin_p = home_t, edge_h, "home", fd_h, pin_h
+                            t_team, edge, fd_p, pin_p = home_t, edge_h, fd_h, pin_h
                         else: continue
 
                         new_results.append({
@@ -181,14 +180,26 @@ if st.session_state.scan_results:
             m1.metric(f"{'Spread' if res['Market']=='spreads' else 'Price'} Edge", f"{res['Edge_Raw']} {res['Edge_Label']}")
             m2.metric("Pinnacle Price", f"{res['PIN_Price']}")
             
-            btn_key = f"audit_{res['Matchup']}_{res['Target_Raw']}"
-            if st.button(f"🔎 Run Intel Audit", key=btn_key):
-                with st.spinner(f"Analyzing {res['Sport']} Tactical Symmetry..."):
-                    audit = get_intel_audit(res['Matchup'], res['Sport'], res['Market'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key)
-                    st.session_state[f"audit_text_{btn_key}"] = audit
+            # --- TWO BUTTON SYSTEM ---
+            col_a, col_b = st.columns(2)
             
-            if f"audit_text_{btn_key}" in st.session_state:
-                st.markdown("### 📋 Strategic Intel Audit")
-                st.write(st.session_state[f"audit_text_{btn_key}"])
+            # Button 1: Quick Intel
+            if col_a.button(f"⚡ Quick Intel", key=f"quick_btn_{res['Matchup']}"):
+                with st.spinner("Fetching 30-second brief..."):
+                    res_text = get_intel_audit(res['Matchup'], res['Sport'], res['Market'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key, mode="quick")
+                    st.session_state[f"quick_res_{res['Matchup']}"] = res_text
+            
+            # Button 2: Detailed Intel
+            if col_b.button(f"🔎 Detailed Intel", key=f"detail_btn_{res['Matchup']}"):
+                with st.spinner("Executing Strategic Deep Dive..."):
+                    res_text = get_intel_audit(res['Matchup'], res['Sport'], res['Market'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key, mode="detailed")
+                    st.session_state[f"detail_res_{res['Matchup']}"] = res_text
+            
+            # Display logic for both
+            if f"quick_res_{res['Matchup']}" in st.session_state:
+                st.info(f"⚡ **Quick Audit:**\n\n{st.session_state[f'quick_res_{res['Matchup']}']}")
+            if f"detail_res_{res['Matchup']}" in st.session_state:
+                st.success(f"🔎 **Strategic Deep Dive:**\n\n{st.session_state[f'detail_res_{res['Matchup']}']}")
+
 else:
-    st.info("No games currently meet your Edge requirements.")
+    st.info("No games meet your Edge requirements.")
