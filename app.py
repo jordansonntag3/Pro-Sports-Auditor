@@ -6,11 +6,7 @@ import time
 from io import StringIO
 
 # 1. Page Configuration
-st.set_page_config(
-    page_title="BANG! Button", 
-    page_icon="💥", 
-    layout="wide"
-)
+st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
 # 2. Sidebar Controls
 with st.sidebar:
@@ -18,14 +14,14 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("All Cache Wiped.")
+        st.success("Logic & Cache Wiped!")
         st.rerun()
     st.divider()
     st.markdown("""
-    **Confidence Tiers:**
-    * 🚀 **1.5+**: SMASH
-    * 🟢 **1.0**: STRONG
-    * 🟡 **0.5**: VALUE
+    **Signal Strength Definitions:**
+    * 🟢 **PURE VALUE**: Stable market, FanDuel is simply lagging.
+    * 🟡 **CAUTION**: News is fresh, line is moving, edge is thin.
+    * 🔴 **STALE / TRAP**: Line is crashing; news is worse than the points.
     """)
 
 st.title("💥 BANG! Button")
@@ -36,24 +32,35 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE FUNCTION (Corrected Model ID) ---
-def get_ai_intelligence(matchup, _key):
-    # Fixed: Added "-preview" to the model name
+# --- AI INTELLIGENCE (The 3-Question Forensic Audit) ---
+def get_forensic_audit(matchup, target_team, edge, velocity, _key):
+    # Using the Lite model for high-quota stability as discussed
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
+    prompt = f"""
+    MARKET AUDIT: {matchup}
+    TARGET: {target_team} | MATH EDGE: {edge} pts | VELOCITY: {velocity} pts
+    
+    As a professional market analyst for March 20, 2026, answer these 3 questions:
+    1. NEWS ANCHOR: What specific news (injuries, rest, or sharp action) is driving the {velocity} point move?
+    2. VALUE INTEGRITY: Does the {edge} point math edge actually compensate for the roster news found in #1?
+    3. MARKET FLOOR: Is this line stable at FanDuel's current price, or is it still 'accelerating' (crashing) toward a new price?
+    
+    FINAL SIGNAL: Categorize as 🟢 PURE VALUE, 🟡 CAUTION, or 🔴 STALE/TRAP.
+    Format your response as a clean bulleted list. Be concise.
+    """
+    
     payload = {
-        "contents": [{"parts": [{"text": f"Search for latest injury news and roster health for: {matchup}. Provide a 1-sentence summary and recommendation: 🟢 PLAY or 🛑 HARD PASS."}]}],
+        "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"google_search": {}}],
         "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}] 
     }
     
     try:
         response = requests.post(url, json=payload, timeout=30).json()
-        if "error" in response:
-            err = response["error"].get("message", "").upper()
-            return f"🛑 API Error: {err[:25]}"
+        if "error" in response: return "🛑 API Limit Reached."
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
-        return parts[0]['text'].strip() if parts else "🔍 No news found."
+        return parts[0]['text'].strip() if parts else "🔍 No forensic data found."
     except: return "⚠️ CONNECTION ERROR"
 
 # --- LIVE DATA LOADING ---
@@ -65,10 +72,7 @@ def load_opening_data():
         resp = requests.get(f"{RAW_URL}?v={time.time()}", headers=headers)
         if resp.status_code == 200:
             df = pd.read_csv(StringIO(resp.text))
-            file_date = "N/A"
-            if not df.empty and 'Recorded_At' in df.columns:
-                utc_dt = pd.to_datetime(df['Recorded_At'].iloc[-1])
-                file_date = (utc_dt - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')
+            file_date = (pd.to_datetime(df['Recorded_At'].iloc[-1]) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p') if not df.empty else "N/A"
             return df, file_date
         return pd.DataFrame(), "File Not Found"
     except: return pd.DataFrame(), "Connection Error"
@@ -84,20 +88,13 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_edge = st.slider("Min. Price Edge (Hard Floor):", 0.5, 2.0, 0.5, 0.5)
-
     with col_set2:
         st.write("**Leagues to Scan:**")
-        leagues_master = {
-            "NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab",
-            "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"
-        }
+        leagues_master = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
         c1, c2, c3 = st.columns(3)
-        # ALL BIG 5 CHECKED BY DEFAULT
-        do_nba = c1.checkbox("NBA", value=True)
-        do_nhl = c2.checkbox("NHL", value=True)
-        do_ncaab = c3.checkbox("NCAA B", value=True)
-        do_nfl = c1.checkbox("NFL", value=True)
-        do_ncaaf = c2.checkbox("NCAA F", value=True)
+        # ALL CHECKED BY DEFAULT
+        do_nba, do_nhl, do_ncaab = c1.checkbox("NBA", value=True), c2.checkbox("NHL", value=True), c3.checkbox("NCAA B", value=True)
+        do_nfl, do_ncaaf = c1.checkbox("NFL", value=True), c2.checkbox("NCAA F", value=True)
         
         selected_keys = []
         if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
@@ -110,91 +107,65 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
 if st.button("🚀 RUN SCAN", use_container_width=True):
     new_results = []
     now_utc = datetime.utcnow()
-    t_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    t_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    t_from, t_to = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'), (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     for display_name, sport_key in selected_keys:
         url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/odds/"
         params = {"apiKey": api_key, "regions": "us,eu", "markets": "spreads", "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": t_from, "commenceTimeTo": t_to}
-        
         try:
-            resp = requests.get(url, params=params)
-            data = resp.json()
-            
-            # Safety Check: Only process if the API returned a valid list of games
+            data = requests.get(url, params=params).json()
             if isinstance(data, list):
                 for game in data:
                     away_t, home_t = game.get('away_team'), game.get('home_team')
                     fd_away, pin_away = None, None
-                    
                     for book in game.get('bookmakers', []):
-                        outcomes = book.get('markets', [{}])[0].get('outcomes', [])
-                        for o in outcomes:
+                        mkts = book.get('markets', [{}])[0].get('outcomes', [])
+                        for o in mkts:
                             if o.get('name') == away_t:
                                 if book['key'] == 'fanduel': fd_away = o.get('point')
                                 elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                     if fd_away is not None and pin_away is not None:
-                        # Determine current edge
-                        if fd_away > pin_away:
-                            target_team, edge, side = away_t, fd_away - pin_away, "away"
-                        else:
-                            target_team, edge, side = home_t, pin_away - fd_away, "home"
-
-                        # --- THE IRONCLAD FLOOR ---
-                        # Kills the game immediately if edge is below slider setting (0.5 default)
-                        if edge < (min_edge - 0.01):
-                            continue
-
-                        matchup_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
+                        t_team, edge, side = (away_t, fd_away - pin_away, "away") if fd_away > pin_away else (home_t, pin_away - fd_away, "home")
+                        if edge < (min_edge - 0.01): continue
                         
-                        # Velocity Math
+                        m_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
                         vel_val = 0.0
                         if not opening_df.empty:
-                            hist = opening_df[opening_df['Matchup'] == matchup_key]
+                            hist = opening_df[opening_df['Matchup'] == m_key]
                             if not hist.empty:
                                 pin_open_away = hist.iloc[0]['Open_Pinnacle']
-                                away_move = pin_away - pin_open_away
-                                vel_val = away_move if side == "away" else -away_move
+                                vel_val = (pin_away - pin_open_away) if side == "away" else -(pin_away - pin_open_away)
 
                         total_score = edge + vel_val
-                        
                         if total_score >= 0.49:
-                            if total_score >= 1.45: v_text, v_color, emoji = "SMASH PLAY", "red", "🚀"
-                            elif total_score >= 0.95: v_text, v_color, emoji = "STRONG PLAY", "green", "🟢"
-                            else: v_text, v_color, emoji = "VALUE PLAY", "orange", "🟡"
-
-                            steam = " 🔥" if abs(vel_val) >= 0.95 else ""
-                            def fmt(l): return f"+{l}" if l > 0 else f"{l}"
-                            
                             new_results.append({
-                                "Target": f"{target_team} {fmt(fd_away if side=='away' else -fd_away)}",
-                                "Matchup": f"{away_t} @ {home_t}",
-                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Velocity": f"{vel_val:+.1f}{steam}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}",
-                                "Verdict": f"{emoji} {v_text}", "V_Color": v_color
+                                "Target": f"{t_team} {'+' if fd_away > 0 else ''}{fd_away if side=='away' else -fd_away}",
+                                "Target_Raw": t_team, "Edge_Raw": edge, "Vel_Raw": vel_val,
+                                "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                                "Velocity": f"{vel_val:+.1f}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}"
                             })
         except: continue
-            
     st.session_state.scan_results = new_results
 
 # 6. DISPLAY ENGINE
 if st.session_state.scan_results:
-    st.success(f"🚨 Found {len(st.session_state.scan_results)} Targets")
     for res in st.session_state.scan_results:
         with st.container(border=True):
             st.subheader(f"{res['Target']}")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']}")
             m1, m2, m3 = st.columns(3)
-            m1.metric("Current Edge", f"{res['Edge']} pts")
+            m1.metric("Price Edge", f"{res['Edge']} pts")
             m2.metric("Market Velocity", f"{res['Velocity']} pts")
-            m3.markdown(f"**Score: {res['Score']}**\n### :{res['V_Color']}[{res['Verdict']}]")
+            m3.metric("Combined Score", f"{res['Score']}")
             
-            if st.button(f"🔍 Analyze Roster", key=f"intel_{res['Matchup']}"):
-                with st.spinner("Talking to Google..."):
-                    report = get_ai_intelligence(res['Matchup'], gemini_key)
-                    st.session_state[f"report_{res['Matchup']}"] = report
-            if f"report_{res['Matchup']}" in st.session_state:
-                st.info(f"**Roster Intel:** {st.session_state[f'report_{res['Matchup']}']}")
+            if st.button(f"🔎 Run Forensic Audit", key=f"intel_{res['Matchup']}"):
+                with st.spinner("Analyzing Market Alignment..."):
+                    audit = get_forensic_audit(res['Matchup'], res['Target_Raw'], res['Edge_Raw'], res['Vel_Raw'], gemini_key)
+                    st.session_state[f"audit_{res['Matchup']}"] = audit
+            
+            if f"audit_{res['Matchup']}" in st.session_state:
+                st.markdown("### 🕵️ Intelligence Audit")
+                st.write(st.session_state[f"audit_{res['Matchup']}"])
 else:
-    st.info(f"No games meet the {min_edge} Edge Floor.")
+    st.info(f"No games meet the {min_edge} Edge requirement.")
