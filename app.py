@@ -14,14 +14,15 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("Audit Logic Reset.")
+        st.success("Audit Logic & Cache Reset.")
         st.rerun()
     st.divider()
     st.markdown("""
-    **Intel Audit Framework:**
+    **The Intel Audit Framework:**
     * 🔍 **THE CATALYST**: The 1-sentence 'Why'.
-    * 🌊 **THE VIBE**: Stable vs. Fluid markets.
-    * 📊 **THE SCORECARD**: Volume-based Production Gaps.
+    * 🌊 **THE VIBE**: Market Stability Check.
+    * 📊 **THE SCORECARD**: Star vs. Replacement Math.
+    * 🧠 **GEMINI'S DEEP DIVE**: Bracket-style game synthesis.
     """)
 
 st.title("💥 BANG! Button")
@@ -32,29 +33,32 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE (The Intel Audit) ---
+# --- AI INTELLIGENCE (The Strategic Deep Dive) ---
 def get_intel_audit(matchup, sport, target_team, fd_p, pin_p, edge, _key):
-    # Using Lite for high-quota stability and speed
+    # Using Lite for 1,000 RPD quota stability
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     prompt = f"""
-    INTEL AUDIT: {matchup} ({sport})
+    STRATEGIC INTEL AUDIT: {matchup} ({sport})
     TARGET: {target_team} {fd_p} (vs Pinnacle {pin_p})
     MATH EDGE: {edge} points
     DATE: March 20, 2026
     
-    Provide a professional 3-pillar Intel Audit:
+    You are a Strategic Betting Analyst. Provide a deep-dive audit using these 4 pillars:
     
-    1. THE CATALYST: In 1 sentence, identify the 'News Anchor' (injury, rest, or significant sharp move) for today.
-    2. THE VIBE: Is the market 'Stable' (news is older/priced in) or 'Fluid' (line is actively moving/crashing)?
-    3. THE SCORECARD: Identify the key player out/returning. Calculate the 'Production Gap' using volume metrics:
-       - NBA/NCAA B: PPG and Usage Rate.
-       - NHL: Shots on Goal (SOG) and Time on Ice (TOI).
-       - NFL/NCAA F: EPA per Play (QBs) or Targets/Air Yards (Skill Players).
-       Subtract the missing star's average from the replacement's average. 
-       End with one relevant 'Talking Head' quote or deep team stat from today.
+    1. THE CATALYST: In 1 sentence, identify the 'News Anchor' (injury, rest, or move) driving the market today.
+    2. THE VIBE: Is the market 'Stable' (priced in) or 'Fluid' (active move)?
+    3. THE SCORECARD: Identify the star player out and their LIKELY REPLACEMENT. 
+       Calculate the 'Production Gap' using volume metrics:
+       - NBA/NCAA B: Usage Rate & PPG.
+       - NHL: Shots on Goal (SOG) & TOI.
+       - NFL/NCAA F: EPA per Play (QBs) or Targets/Air Yards (Skill).
+       Compare Star vs. Replacement stats.
+    4. GEMINI'S DEEP DIVE: Perform a synthesis of the spread and the news. Does the {edge}-point math edge 
+       adequately cover the 'Production Gap' found in Pillar 3? Provide a bracket-style analytical 
+       breakdown of the matchup (e.g., coaching, depth, or situational edge).
     
-    Format as 3 clear bulleted sections. Keep it cold, analytical, and focused on production value.
+    Format as 4 clear sections. Be cold, analytical, and highly detailed in Pillar 4.
     """
     
     payload = {
@@ -67,7 +71,7 @@ def get_intel_audit(matchup, sport, target_team, fd_p, pin_p, edge, _key):
         response = requests.post(url, json=payload, timeout=30).json()
         if "error" in response: return "🛑 API Limit Reached."
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
-        return parts[0]['text'].strip() if parts else "🔍 No audit data found."
+        return parts[0]['text'].strip() if parts else "🔍 No audit found."
     except: return "⚠️ CONNECTION ERROR"
 
 # --- LIVE DATA LOADING ---
@@ -88,7 +92,7 @@ opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
 st.divider()
 
-# 4. AUDIT SETTINGS (NCAA F Returned)
+# 4. AUDIT SETTINGS
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_set1, col_set2 = st.columns([1, 1])
     with col_set1:
@@ -96,13 +100,7 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         min_edge = st.slider("Min. Price Edge (Hard Floor):", 0.5, 2.0, 0.5, 0.5)
     with col_set2:
         st.write("**Leagues to Scan:**")
-        leagues_master = {
-            "NBA": "basketball_nba", 
-            "NHL": "icehockey_nhl", 
-            "NCAA B": "basketball_ncaab", 
-            "NFL": "americanfootball_nfl",
-            "NCAA F": "americanfootball_ncaaf"
-        }
+        leagues_master = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
         c1, c2, c3 = st.columns(3)
         do_nba = c1.checkbox("NBA", value=True)
         do_nhl = c2.checkbox("NHL", value=True)
@@ -133,7 +131,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     away_t, home_t = game.get('away_team'), game.get('home_team')
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
-                        for o in b.get('markets', [{}])[0].get('outcomes', []):
+                        for o in b.get('markets', [{}])[0].get('outcomes', []) or []:
                             if o['name'] == away_t:
                                 if b['key'] == 'fanduel': fd_a = o['point']
                                 elif b['key'] == 'pinnacle': pin_a = o['point']
@@ -146,7 +144,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                         if edge_a > edge_h and edge_a >= (min_edge - 0.01):
                             t_team, edge, side, fd_p, pin_p = away_t, edge_a, "away", fd_a, pin_a
                         elif edge_h >= (min_edge - 0.01):
-                            t_team, edge, side, fd_p, pin_p = home_t, edge_h, "home", fd_h, pin_h
+                            t_team, edge, side, home_t, edge_h, "home", fd_h, pin_h
                         else: continue
                         
                         m_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
@@ -180,7 +178,7 @@ if st.session_state.scan_results:
             
             btn_key = f"audit_{res['Matchup']}_{res['Target_Raw']}"
             if st.button(f"🔎 Run Intel Audit", key=btn_key):
-                with st.spinner(f"Vetting {res['Sport']} Volume Metrics..."):
+                with st.spinner(f"Analyzing {res['Sport']} Strategic Matchups..."):
                     audit = get_intel_audit(res['Matchup'], res['Sport'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key)
                     st.session_state[f"audit_text_{btn_key}"] = audit
             
@@ -188,4 +186,4 @@ if st.session_state.scan_results:
                 st.markdown("### 📋 The Intel Audit")
                 st.write(st.session_state[f"audit_text_{btn_key}"])
 else:
-    st.info(f"No games meet the {min_edge} requirement.")
+    st.info(f"No games currently meet the {min_edge} requirement.")
