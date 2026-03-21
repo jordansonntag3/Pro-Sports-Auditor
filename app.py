@@ -12,10 +12,15 @@ st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
+    
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
-        st.session_state.clear()
+        # Clean out all session data including alert history
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.success("System & Alert Registry Reset.")
         st.rerun()
+        
     st.divider()
     st.markdown("**Vibe Guide:** 🚀 Velocity | ⚓ Stable | 🌊 Drift")
 
@@ -25,6 +30,7 @@ st.title("💥 BANG! Button")
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
+if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set() # Deduping Registry
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -32,6 +38,13 @@ for league in leagues_list:
 
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
+discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
+
+# --- UTILITY: DISCORD SYNDICATE FEED ---
+def send_discord_live(messages):
+    if discord_live_url and messages:
+        payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
+        requests.post(discord_live_url, json=payload)
 
 # --- MASTER INTELLIGENCE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
@@ -44,10 +57,12 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     SYSTEM ROLE: Strategic Betting Analyst.
     GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p})
     MATH EDGE: {edge} {edge_label}
-    INSTRUCTIONS: 1. Identify goalie status (NHL) or fatigue (NBA). 2. Check if the line movement has already priced this in. 3. Reach a Verdict.
+    INSTRUCTIONS: 1. Audit Goalie/Fatigue. 2. Compare movement vs opening. 3. Final Verdict.
     """
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
-    if should_search: payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
+    if should_search: 
+        payload["tools"] = [{"google_search": {}}]
+        time.sleep(1.5)
 
     try:
         response = requests.post(url, json=payload, timeout=30).json()
@@ -58,11 +73,10 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
     except: return "⚠️ API ERROR"
 
-# --- TABS: SCANNER VS LEDGER ---
+# --- TABS ---
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
 
 with tab1:
-    # --- AUDIT SETTINGS ---
     with st.expander("🛠️ Audit & Display Settings", expanded=True):
         col_set1, col_set2 = st.columns([1, 1.2])
         with col_set1:
@@ -82,11 +96,12 @@ with tab1:
                     st.rerun()
                 if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
-    # --- SCANNING ENGINE ---
     if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
         new_res = []
+        discord_messages = []
         now_utc = datetime.utcnow()
-        # Opening Line Data
+        
+        # Load Opening Lines for Vibe Meter
         RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
         try: op_df = pd.read_csv(f"{RAW_URL}?v={time.time()}")
         except: op_df = pd.DataFrame()
@@ -131,15 +146,28 @@ with tab1:
                                 try:
                                     opening_row = op_df[op_df['Team'] == t_team].iloc[-1]
                                     mov = abs(fd_p - opening_row['Opening_Line'])
-                                    if mov > 1.0: vibe = "🚀"
-                                    elif mov < 0.5: vibe = "⚓"
+                                    if mov >= 1.0: vibe = "🚀"
+                                    elif mov <= 0.5: vibe = "⚓"
                                 except: pass
+
+                            # ALERT DEDUPING LOGIC
+                            alert_threshold = 20 if mkt == 'h2h' else 1.0
+                            # Unique key: Team + Line + Sport (e.g., "Dallas_1.0_NBA")
+                            alert_fingerprint = f"{t_team}_{fd_p}_{name}"
+                            
+                            if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
+                                line_str = f"{'+' if mkt=='spreads' and fd_p > 0 else ''}{fd_p}"
+                                discord_messages.append(f"- {vibe} **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
+                                st.session_state.sent_alerts.add(alert_fingerprint)
 
                             new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
+        
         st.session_state.scan_results = new_res
+        if discord_messages:
+            send_discord_live(discord_messages)
+            st.toast(f"Pushed {len(discord_messages)} new values to Discord Syndicate!")
 
-    # --- DISPLAY ENGINE ---
     if st.session_state.scan_results:
         for res in st.session_state.scan_results:
             with st.container(border=True):
@@ -152,9 +180,8 @@ with tab1:
                 c1.metric("Market Edge", f"{res.get('Edge', 0):.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
                 if res['Market'] == 'h2h': c2.metric("Pinnacle Price", f"{res['PIN']}")
                 
-                ca, cb, cc = st.columns([1, 1, 0.5]) # CC is the new Log Button Column
+                ca, cb, cc = st.columns([1, 1, 0.5])
                 q_k, d_k = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
-                
                 if ca.button(f"⚡ Quick Intel", key=f"btn_{q_k}", use_container_width=True):
                     st.session_state[q_k] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res.get('Edge', 0), gemini_key, mode="quick")
                 if cb.button(f"🔎 Detailed Intel", key=f"btn_{d_k}", use_container_width=True):
