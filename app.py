@@ -16,10 +16,8 @@ with st.sidebar:
     
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
-        # Full wipe to clear memory and re-sync with GitHub
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.success("System Reset. Re-syncing with Master Ledger...")
         st.rerun()
         
     st.divider()
@@ -31,7 +29,7 @@ st.title("💥 BANG! Button")
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
-if "bet_history" not in st.session_state: st.session_state.bet_history = [] # Local record
+if "bet_history" not in st.session_state: st.session_state.bet_history = []
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -43,10 +41,13 @@ gemini_key = st.secrets["GEMINI_API_KEY"]
 discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
 github_token = st.secrets.get("GITHUB_TOKEN")
 
-# --- UTILITY: DECIMAL TO AMERICAN ODDS ---
+# --- UTILITY: ODDS CONVERTER ---
 def to_american(decimal):
-    if decimal >= 2.0: return f"+{int((decimal - 1) * 100)}"
-    else: return f"{int(-100 / (decimal - 1))}"
+    try:
+        decimal = float(decimal)
+        if decimal >= 2.0: return f"+{int((decimal - 1) * 100)}"
+        else: return f"{int(-100 / (decimal - 1))}"
+    except: return str(decimal)
 
 # --- UTILITY: PERMANENT GITHUB LEDGER ---
 def log_to_github_ledger(new_data):
@@ -68,14 +69,27 @@ def log_to_github_ledger(new_data):
     df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     new_csv = df.to_csv(index=False)
     encoded_content = base64.b64encode(new_csv.encode('utf-8')).decode('utf-8')
-
     payload = {"message": f"Log Play: {new_data['Team']}", "content": encoded_content, "branch": "main"}
     if sha: payload["sha"] = sha
-    
-    put_r = requests.put(url, headers=headers, json=payload)
-    return put_r.status_code in [200, 201]
+    return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
-# --- LOAD MASTER LEDGER ON STARTUP ---
+def delete_last_from_github_ledger():
+    repo = "jordansonntag3/Pro-Sports-Auditor"
+    path = "bet_ledger.csv"
+    url = f"https://api.github.com/repos/{repo}/contents/{path}"
+    headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
+    r = requests.get(url, headers=headers)
+    if r.status_code == 200:
+        content_data = r.json(); sha = content_data['sha']
+        df = pd.read_csv(StringIO(base64.b64decode(content_data['content']).decode('utf-8')))
+        if not df.empty:
+            df = df.drop(df.index[-1])
+            encoded_content = base64.b64encode(df.to_csv(index=False).encode('utf-8')).decode('utf-8')
+            payload = {"message": "Delete Last Entry", "content": encoded_content, "sha": sha, "branch": "main"}
+            return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
+    return False
+
+# --- SYNC LEDGER ON STARTUP ---
 if not st.session_state.bet_history:
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
@@ -85,8 +99,7 @@ if not st.session_state.bet_history:
 
 def send_discord_live(messages):
     if discord_live_url and messages:
-        payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
-        requests.post(discord_live_url, json=payload)
+        requests.post(discord_live_url, json={"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(messages)})
 
 # --- MASTER INTELLIGENCE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
@@ -94,21 +107,22 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
-
-    format_rules = "MAX 2 SENTENCES. End with bold verdict." if mode == "quick" else "Detailed Audit + Bold Verdict."
-    prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {format_rules}"
     
+    if mode == "quick":
+        rules = "MAX 2 SENTENCES. End with bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+    else:
+        rules = "Structure: Roster Audit, Fatigue Spot, Market Verdict. End with bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+
+    prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {rules}"
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search: 
         payload["tools"] = [{"google_search": {}}]
         time.sleep(1.5)
-
     try:
         response = requests.post(url, json=payload, timeout=30).json()
         candidate = response.get('candidates', [{}])[0]
-        grounding = candidate.get('groundingMetadata', {})
-        if grounding and not cached_news:
-            st.session_state.search_ledger[matchup] = str(grounding.get('searchEntryPoint', ''))
+        if 'groundingMetadata' in candidate and not cached_news:
+            st.session_state.search_ledger[matchup] = str(candidate['groundingMetadata'].get('searchEntryPoint', ''))
         return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
     except: return "⚠️ API ERROR"
 
@@ -138,6 +152,7 @@ with tab1:
     if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []
         discord_messages = []
+        now_utc = datetime.utcnow()
         RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
         try: op_df = pd.read_csv(f"{RAW_URL}?v={time.time()}")
         except: op_df = pd.DataFrame()
@@ -150,6 +165,10 @@ with tab1:
                 data = requests.get(url, params=params).json()
                 if isinstance(data, list):
                     for game in data:
+                        # --- PUCK DROP FILTER ---
+                        commence_time = pd.to_datetime(game['commence_time']).replace(tzinfo=None)
+                        if commence_time < now_utc: continue
+                        
                         away_t, home_t = game.get('away_team'), game.get('home_team')
                         fd_a, pin_a, fd_h, pin_h = None, None, None, None
                         for b in game.get('bookmakers', []):
@@ -186,6 +205,7 @@ with tab1:
                                     elif mov <= 0.5: vibe = "⚓"
                                 except: pass
 
+                            # Syndicate Alert Logic
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
                             alert_fingerprint = f"{t_team}_{fd_p}_{name}"
                             if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
@@ -221,30 +241,24 @@ with tab1:
                 
                 if cd.button(f"✅ LOG PLAY", key=f"log_{res['Matchup']}", use_container_width=True, type="primary"):
                     with st.spinner("Saving..."):
-                        bet_data = {
-                            "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "Team": res['Target'],
-                            "Sport": res['Sport'],
-                            "Line": display_price,
-                            "Edge": f"{res['Edge']:.1f}",
-                            "Vibe": v,
-                            "Units": units
-                        }
+                        bet_data = {"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Vibe": v, "Units": units}
                         if log_to_github_ledger(bet_data):
-                            # INSTANT UPDATE: Add to local session before refresh
                             st.session_state.bet_history.append(bet_data)
                             st.toast("✅ Saved Permanently!")
-                            time.sleep(0.5)
-                            st.rerun()
+                            time.sleep(0.5); st.rerun()
 
                 if q_k in st.session_state: st.info(st.session_state[q_k])
                 if d_k in st.session_state: st.success(st.session_state[d_k])
 
 with tab2:
     st.header("📈 Performance Ledger")
-    # Show the local record combined with the startup record
+    col_a, col_b = st.columns([1, 4])
+    if col_a.button("🗑️ DELETE LAST", use_container_width=True):
+        if delete_last_from_github_ledger():
+            st.toast("Deleted Last Entry."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
+            
     if st.session_state.bet_history:
         master_df = pd.DataFrame(st.session_state.bet_history)
         st.dataframe(master_df.iloc[::-1], use_container_width=True)
     else:
-        st.info("No plays logged. Log a play to build your history!")
+        st.info("No plays logged yet.")
