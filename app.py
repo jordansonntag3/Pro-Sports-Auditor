@@ -14,11 +14,11 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("Briefing Logic Reset.")
+        st.success("Audit Logic Reset.")
         st.rerun()
     st.divider()
     st.markdown("""
-    **The Lunch Break Framework:**
+    **Intel Audit Framework:**
     * 🔍 **THE CATALYST**: The 1-sentence 'Why'.
     * 🌊 **THE VIBE**: Stable vs. Fluid markets.
     * 📊 **THE SCORECARD**: Volume-based Production Gaps.
@@ -32,28 +32,29 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE (The Volume-Metric Briefing) ---
-def get_lunch_break_briefing(matchup, sport, target_team, fd_p, pin_p, edge, _key):
+# --- AI INTELLIGENCE (The Intel Audit) ---
+def get_intel_audit(matchup, sport, target_team, fd_p, pin_p, edge, _key):
+    # Using Lite for high-quota stability and speed
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     prompt = f"""
-    LUNCH BREAK BRIEFING: {matchup} ({sport})
+    INTEL AUDIT: {matchup} ({sport})
     TARGET: {target_team} {fd_p} (vs Pinnacle {pin_p})
     MATH EDGE: {edge} points
     DATE: March 20, 2026
     
-    You are a casual betting analyst. Provide a 3-pillar briefing.
+    Provide a professional 3-pillar Intel Audit:
     
-    1. THE CATALYST: In 1 sentence, what is the 'News Anchor' (injury/rest) for today?
-    2. THE VIBE: Is the market 'Stable' (news is 4+ hours old) or 'Fluid' (line is crashing)?
-    3. THE SCORECARD: Identify the key player out/returning. Calculate the 'Production Gap' using:
-       - NBA: PPG and Usage Rate.
+    1. THE CATALYST: In 1 sentence, identify the 'News Anchor' (injury, rest, or significant sharp move) for today.
+    2. THE VIBE: Is the market 'Stable' (news is older/priced in) or 'Fluid' (line is actively moving/crashing)?
+    3. THE SCORECARD: Identify the key player out/returning. Calculate the 'Production Gap' using volume metrics:
+       - NBA/NCAA B: PPG and Usage Rate.
        - NHL: Shots on Goal (SOG) and Time on Ice (TOI).
-       - NFL: Targets/Air Yards (Skill) or EPA per Play (QBs).
+       - NFL/NCAA F: EPA per Play (QBs) or Targets/Air Yards (Skill Players).
        Subtract the missing star's average from the replacement's average. 
-       Add a 'Talking Head' quote or relevant team stat to close.
+       End with one relevant 'Talking Head' quote or deep team stat from today.
     
-    Format as 3 bulleted sections. Keep it conversational but data-driven.
+    Format as 3 clear bulleted sections. Keep it cold, analytical, and focused on production value.
     """
     
     payload = {
@@ -66,7 +67,7 @@ def get_lunch_break_briefing(matchup, sport, target_team, fd_p, pin_p, edge, _ke
         response = requests.post(url, json=payload, timeout=30).json()
         if "error" in response: return "🛑 API Limit Reached."
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
-        return parts[0]['text'].strip() if parts else "🔍 No briefing found."
+        return parts[0]['text'].strip() if parts else "🔍 No audit data found."
     except: return "⚠️ CONNECTION ERROR"
 
 # --- LIVE DATA LOADING ---
@@ -87,7 +88,7 @@ opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
 st.divider()
 
-# 4. AUDIT SETTINGS (MLB Removed)
+# 4. AUDIT SETTINGS (NCAA F Returned)
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_set1, col_set2 = st.columns([1, 1])
     with col_set1:
@@ -95,16 +96,26 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         min_edge = st.slider("Min. Price Edge (Hard Floor):", 0.5, 2.0, 0.5, 0.5)
     with col_set2:
         st.write("**Leagues to Scan:**")
-        leagues_master = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl"}
+        leagues_master = {
+            "NBA": "basketball_nba", 
+            "NHL": "icehockey_nhl", 
+            "NCAA B": "basketball_ncaab", 
+            "NFL": "americanfootball_nfl",
+            "NCAA F": "americanfootball_ncaaf"
+        }
         c1, c2, c3 = st.columns(3)
-        do_nba, do_nhl, do_ncaab = [c.checkbox(n, value=True) for c, n in zip([c1, c2, c3], ["NBA", "NHL", "NCAA B"])]
+        do_nba = c1.checkbox("NBA", value=True)
+        do_nhl = c2.checkbox("NHL", value=True)
+        do_ncaab = c3.checkbox("NCAA B", value=True)
         do_nfl = c1.checkbox("NFL", value=True)
+        do_ncaaf = c2.checkbox("NCAA F", value=True)
         
         selected_keys = []
         if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
         if do_nhl: selected_keys.append(("NHL", leagues_master["NHL"]))
         if do_ncaab: selected_keys.append(("NCAA B", leagues_master["NCAA B"]))
         if do_nfl: selected_keys.append(("NFL", leagues_master["NFL"]))
+        if do_ncaaf: selected_keys.append(("NCAA F", leagues_master["NCAA F"]))
 
 # 5. ENGINE
 if st.button("🚀 RUN SCAN", use_container_width=True):
@@ -122,8 +133,7 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                     away_t, home_t = game.get('away_team'), game.get('home_team')
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
-                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
-                        for o in mkts:
+                        for o in b.get('markets', [{}])[0].get('outcomes', []):
                             if o['name'] == away_t:
                                 if b['key'] == 'fanduel': fd_a = o['point']
                                 elif b['key'] == 'pinnacle': pin_a = o['point']
@@ -133,7 +143,6 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
 
                     if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
                         edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
-                        
                         if edge_a > edge_h and edge_a >= (min_edge - 0.01):
                             t_team, edge, side, fd_p, pin_p = away_t, edge_a, "away", fd_a, pin_a
                         elif edge_h >= (min_edge - 0.01):
@@ -169,14 +178,14 @@ if st.session_state.scan_results:
             m2.metric("Market Velocity", f"{res['Velocity']} pts")
             m3.metric("Combined Score", f"{res['Score']}")
             
-            btn_key = f"brief_{res['Matchup']}_{res['Target_Raw']}"
-            if st.button(f"☕ Get Lunch Break Briefing", key=btn_key):
+            btn_key = f"audit_{res['Matchup']}_{res['Target_Raw']}"
+            if st.button(f"🔎 Run Intel Audit", key=btn_key):
                 with st.spinner(f"Vetting {res['Sport']} Volume Metrics..."):
-                    brief = get_lunch_break_briefing(res['Matchup'], res['Sport'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key)
-                    st.session_state[f"briefing_{btn_key}"] = brief
+                    audit = get_intel_audit(res['Matchup'], res['Sport'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key)
+                    st.session_state[f"audit_text_{btn_key}"] = audit
             
-            if f"briefing_{btn_key}" in st.session_state:
-                st.markdown("### 📋 The Briefing")
-                st.write(st.session_state[f"briefing_{btn_key}"])
+            if f"audit_text_{btn_key}" in st.session_state:
+                st.markdown("### 📋 The Intel Audit")
+                st.write(st.session_state[f"audit_text_{btn_key}"])
 else:
     st.info(f"No games meet the {min_edge} requirement.")
