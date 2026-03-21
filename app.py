@@ -20,7 +20,6 @@ with st.sidebar:
     
     if st.button("🔄 Full System Reset", use_container_width=True):
         st.cache_data.clear()
-        # Clear ledger and scan results specifically
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.success("System & Ledger Reset.")
@@ -28,11 +27,11 @@ with st.sidebar:
     
     st.divider()
     st.markdown("""
-    **Verdict Definitions:**
+    **Verdict Guide:**
     * 🛑 **PASS**: High risk, low value.
     * ⚪ **NEUTRAL**: Market is efficient.
-    * 🟢 **PLAY**: Significant math/roster edge.
-    * ⚡ **SMASH PLAY**: Rare, massive unpriced edge.
+    * 🟢 **PLAY**: Solid math/roster edge.
+    * ⚡ **SMASH PLAY**: Massive, unpriced advantage.
     """)
 
 st.title("💥 BANG! Button")
@@ -51,32 +50,30 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "points" if market_type == "spreads" else "cents"
     
-    # 1. Check the Ledger for cached search results
+    # 1. Check Ledger
     cached_news = st.session_state.search_ledger.get(matchup)
     
-    # 2. Logic to decide if we burn a Search call
+    # 2. Decide if we search
     should_search = False
-    if grounding_mode == "Live Search":
-        should_search = True
-    elif grounding_mode == "Session Cache Only" and not cached_news:
-        should_search = True
+    if grounding_mode == "Live Search": should_search = True
+    elif grounding_mode == "Session Cache Only" and not cached_news: should_search = True
 
-    # 3. The Unified Prompt (Forces deep thinking first)
+    # 3. The Unified Prompt
     prompt = f"""
-    SYSTEM ROLE: Strategic Betting Analyst auditing {matchup} ({sport}).
-    TARGET: {target_team} {fd_p} (vs Pin {pin_p}) | EDGE: {edge} {edge_label}
+    SYSTEM ROLE: Strategic Betting Analyst.
+    MATCHUP: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p})
+    MATH EDGE: {edge} {edge_label}
     
     CONTEXT: {f'Use these Search Results: {cached_news}' if cached_news else 'Identify roster news and injuries for this game.'}
 
     TASK:
-    - Identify the 'Catalyst' (News/Injuries).
-    - Calculate 'Production Gap' (NBA: Usage/PPG; NHL: SOG/TOI; NFL: EPA/Targets).
-    - Synthesize tactical mismatches and 'Backdoor' potential for large spreads.
-    - REACH A VERDICT: 🛑 PASS, ⚪ NEUTRAL, 🟢 PLAY, or ⚡ SMASH PLAY.
+    1. Perform a deep-dive tactical audit. Calculate 'Production Gap' (NBA/NCAA B: Usage/PPG; NHL: SOG/TOI; NFL: EPA/Targets).
+    2. Synthesize the {edge} {edge_label} edge vs the production loss. 
+    3. Determine a Verdict: 🛑 PASS, ⚪ NEUTRAL, 🟢 PLAY, or ⚡ SMASH PLAY.
 
     OUTPUT STYLE: {mode.upper()} mode. 
     Quick: 1-2 dense sentences per section + Verdict.
-    Detailed: Full tactical deep dive + Verdict.
+    Detailed: Full strategic deep dive + Verdict.
     
     FORMAT: 1. Catalyst | 2. Vibe | 3. Scorecard | 4. Analysis | 5. Verdict.
     """
@@ -88,25 +85,22 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     
     if should_search:
         payload["tools"] = [{"google_search": {}}]
-        time.sleep(1.5) # Anti-429 throttle
+        time.sleep(1.5)
 
-    # 4. Request with Exponential Backoff
     for attempt in range(2):
         try:
             response = requests.post(url, json=payload, timeout=30).json()
             if "error" in response:
                 if response['error']['code'] == 429:
-                    time.sleep(3)
-                    continue
+                    time.sleep(3); continue
                 return f"🛑 API ERROR: {response['error']['message']}"
             
             candidate = response.get('candidates', [{}])[0]
-            # Store search metadata in ledger if we found new info
             grounding = candidate.get('groundingMetadata', {})
             if grounding and not cached_news:
                 st.session_state.search_ledger[matchup] = str(grounding.get('searchEntryPoint', ''))
             
-            return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Analysis Found.').strip()
+            return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
         except: return "⚠️ CONNECTION ERROR"
     return "🛑 API Limit Reached."
 
@@ -120,22 +114,21 @@ def load_opening_data():
             df = pd.read_csv(StringIO(resp.text))
             f_date = (pd.to_datetime(df['Recorded_At'].iloc[-1]) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')
             return df, f_date
-        return pd.DataFrame(), "File Not Found"
-    except: return pd.DataFrame(), "Connection Error"
+        return pd.DataFrame(), "N/A"
+    except: return pd.DataFrame(), "Error"
 
 opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot:** `{csv_timestamp}`")
-st.divider()
 
 # --- AUDIT SETTINGS ---
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_a, col_b = st.columns([1, 1])
     with col_a:
         horizon = st.radio("Window:", ["Today", "Next 48 Hours"], horizontal=True)
-        min_pt_edge = st.slider("Min Spread Edge:", 0.5, 2.0, 0.5, 0.5)
-        min_ml_edge = st.slider("Min NHL Moneyline Edge:", 10, 50, 10, 5)
+        min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 2.0, 0.5, 0.5)
+        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 50, 10, 5)
     with col_b:
-        st.write("**Leagues & Markets:**")
+        st.write("**Leagues to Scan:**")
         l_config = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
         selected = []
         c1, c2, c3 = st.columns(3)
@@ -197,7 +190,6 @@ if st.session_state.scan_results:
             c1.metric(f"{'Spread' if res['Market']=='spreads' else 'Price'} Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
             c2.metric("Pinnacle Price", f"{res['PIN']}")
             
-            # --- TWO BUTTONS ---
             ca, cb = st.columns(2)
             q_key, d_key = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
             
@@ -206,7 +198,10 @@ if st.session_state.scan_results:
             if cb.button(f"🔎 Detailed Intel", key=f"btn_{d_key}"):
                 st.session_state[d_key] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target_Raw'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="detailed")
             
-            if q_key in st.session_state: st.info(f"⚡ **Quick Audit Summary:**\n\n{st.session_state[q_key]}")
-            if d_key in st.session_state: st.success(f"🔎 **Full Strategic Audit:**\n\n{st.session_state[d_key]}")
+            # String Check: Ensures we only display text, preventing the "False" bug
+            if q_key in st.session_state and isinstance(st.session_state[q_key], str): 
+                st.info(f"⚡ **Quick Summary:**\n\n{st.session_state[q_key]}")
+            if d_key in st.session_state and isinstance(st.session_state[d_key], str): 
+                st.success(f"🔎 **Full Strategic Audit:**\n\n{st.session_state[d_key]}")
 else:
     st.info("No games meet your Edge requirements.")
