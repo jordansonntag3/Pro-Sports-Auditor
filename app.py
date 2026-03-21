@@ -14,10 +14,9 @@ with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
     
-    # SMART RESET: Wipes scanner/intel but PROTECTS your active league toggles
     if st.button("🔄 RESET SCANNER & CACHE", use_container_width=True):
         st.cache_data.clear()
-        keys_to_keep = ['active_NBA', 'active_NHL', 'active_NCAA B', 'active_NFL', 'active_NCAA F']
+        keys_to_keep = ['active_NBA', 'active_NHL', 'active_NCAA B', 'active_NFL', 'active_NCAA F', 'sent_alerts']
         for key in list(st.session_state.keys()):
             if key not in keys_to_keep:
                 del st.session_state[key]
@@ -37,74 +36,66 @@ leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
     if f"active_{league}" not in st.session_state: st.session_state[f"active_{league}"] = True
 
-# --- SECRETS (Using your existing names) ---
+# Secrets
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
-github_token = st.secrets.get("GITHUB_TOKEN") # Uses your existing key!
+github_token = st.secrets.get("GITHUB_TOKEN")
 
-# --- UTILITY: PERMANENT GITHUB LEDGER ---
+# --- UTILITY: DECIMAL TO AMERICAN ODDS ---
+def to_american(decimal):
+    if decimal >= 2.0: return f"+{int((decimal - 1) * 100)}"
+    else: return f"{int(-100 / (decimal - 1))}"
+
+# --- UTILITY: PERMANENT GITHUB LEDGER (With Debugging) ---
 def log_to_github_ledger(new_data):
-    repo = "jordansonntag3/Pro-Sports-Auditor"
+    repo = "jordansonntag3/Pro-Sports-Auditor" # Double check this is your repo name!
     path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     
-    # 1. Get current file and its SHA
+    # 1. Get current file
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content_data = r.json()
         sha = content_data['sha']
         current_csv = base64.b64decode(content_data['content']).decode('utf-8')
         df = pd.read_csv(StringIO(current_csv))
-    else:
-        # Initialize file if it doesn't exist in your repo yet
+    elif r.status_code == 404:
         sha = None
         df = pd.DataFrame(columns=["Date", "Team", "Sport", "Line", "Edge", "Vibe", "Units"])
+    else:
+        st.error(f"GitHub Access Error: {r.status_code}. Check your Token permissions.")
+        return False
 
-    # 2. Append the new bet
+    # 2. Append and Encode
     df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     new_csv = df.to_csv(index=False)
     encoded_content = base64.b64encode(new_csv.encode('utf-8')).decode('utf-8')
 
-    # 3. Push the update back to GitHub
-    payload = {
-        "message": f"Log Play: {new_data['Team']}",
-        "content": encoded_content,
-        "branch": "main"
-    }
+    # 3. Push back
+    payload = {"message": f"Log Play: {new_data['Team']}", "content": encoded_content, "branch": "main"} # Change 'main' to 'master' if needed
     if sha: payload["sha"] = sha
     
     put_r = requests.put(url, headers=headers, json=payload)
-    return put_r.status_code in [200, 201]
+    if put_r.status_code in [200, 201]: return True
+    else:
+        st.error(f"GitHub Write Error: {put_r.status_code}. Details: {put_r.text}")
+        return False
 
 def send_discord_live(messages):
     if discord_live_url and messages:
         payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
         requests.post(discord_live_url, json=payload)
-        
-# --- UTILITY: DECIMAL TO AMERICAN ODDS ---
-def to_american(decimal):
-    if decimal >= 2.0:
-        return f"+{int((decimal - 1) * 100)}"
-    else:
-        return f"{int(-100 / (decimal - 1))}"
 
-
-
-# --- MASTER INTELLIGENCE (Verdict Enforcement Edition) ---
+# --- MASTER INTELLIGENCE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
 
-    # THE VERDICT LAW: Strict instructions for the AI
-    if mode == "quick":
-        format_rules = "MAX 2 SENTENCES. You MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
-    else:
-        format_rules = "Structured breakdown: 1. Roster Audit, 2. Fatigue/Schedule, 3. Market Verdict. YOU MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
-
+    format_rules = "MAX 2 SENTENCES. End with bold verdict." if mode == "quick" else "Detailed Audit + Bold Verdict."
     prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {format_rules}"
     
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
@@ -119,7 +110,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         if grounding and not cached_news:
             st.session_state.search_ledger[matchup] = str(grounding.get('searchEntryPoint', ''))
         return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
-    except: return "⚠️ API ERROR: Intel engine timed out."
+    except: return "⚠️ API ERROR"
 
 # --- TABS ---
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
@@ -198,32 +189,29 @@ with tab1:
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
                             alert_fingerprint = f"{t_team}_{fd_p}_{name}"
                             if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
-                                if mkt == 'h2h':
-                                    line_str = to_american(fd_p)
-                                else:
-                                    line_str = f"{'+' if fd_p > 0 else ''}{fd_p}"
+                                line_str = to_american(fd_p) if mkt == 'h2h' else f"{'+' if fd_p > 0 else ''}{fd_p}"
                                 discord_messages.append(f"- {vibe} **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
                                 st.session_state.sent_alerts.add(alert_fingerprint)
 
                             new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
         st.session_state.scan_results = new_res
-        if discord_messages: send_discord_live(discord_messages)
+        if discord_messages: 
+            send_discord_live(discord_messages)
+            st.toast(f"Pushed {len(discord_messages)} alerts to Discord!")
 
     if st.session_state.scan_results:
         for res in st.session_state.scan_results:
             with st.container(border=True):
                 v = res.get('Vibe', '🌊')
-         # Create a clean display version of the price
                 display_price = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
-                h = f"{v} {res['Target']} ({display_price})"
-                st.subheader(h)
+                st.subheader(f"{v} {res['Target']} ({display_price})")
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
+                
                 c1, c2 = st.columns(2)
                 c1.metric("Market Edge", f"{res.get('Edge', 0):.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
                 if res['Market'] == 'h2h': c2.metric("Pinnacle Price", to_american(res['PIN']))
                 
-                # SPECIAL PERMANENT LOGGING ROW
                 ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
                 q_k, d_k = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
                 if ca.button(f"⚡ Quick Intel", key=f"btn_{q_k}", use_container_width=True):
@@ -234,33 +222,29 @@ with tab1:
                 units = cc.number_input("Units", min_value=0.1, max_value=10.0, value=1.0, step=0.5, key=f"u_{res['Matchup']}")
                 
                 if cd.button(f"✅ LOG PLAY", key=f"log_{res['Matchup']}", use_container_width=True, type="primary"):
-                    with st.spinner("Saving to GitHub Ledger..."):
+                    with st.spinner("Saving..."):
                         bet_data = {
                             "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "Team": res['Target'],
                             "Sport": res['Sport'],
-                            "Line": res['FD'],
+                            "Line": display_price, # Saves as +110 or -107
                             "Edge": f"{res['Edge']:.1f}",
                             "Vibe": v,
                             "Units": units
                         }
                         if log_to_github_ledger(bet_data):
-                            st.toast("✅ Permanent Entry Saved!")
-                            time.sleep(1)
+                            st.toast("✅ Saved!")
+                            time.sleep(1.5) # Time for GitHub to reflect
                             st.rerun()
-                        else:
-                            st.error("Failed to write to GitHub. Ensure GITHUB_TOKEN has 'write' access.")
 
                 if q_k in st.session_state: st.info(st.session_state[q_k])
                 if d_k in st.session_state: st.success(st.session_state[d_k])
 
 with tab2:
     st.header("📈 Permanent Performance History")
-    # Pulls directly from the GitHub CSV so it's always live
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
         master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
         st.dataframe(master_df.iloc[::-1], use_container_width=True)
-        st.caption(f"Tracking {len(master_df)} total plays in your historical archive.")
     except:
-        st.info("No permanent records found yet. Hit '✅ LOG PLAY' to start your ledger!")
+        st.info("No permanent records found yet. Log a play to create the file.")
