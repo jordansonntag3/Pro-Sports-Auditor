@@ -20,8 +20,9 @@ with st.sidebar:
     st.markdown("""
     **Intel Audit Framework:**
     * 🔍 **THE CATALYST**: The 1-sentence 'Why'.
-    * 📊 **THE SCORECARD**: Star vs. Replacement Math.
-    * 🧠 **GEMINI'S DEEP DIVE**: Tactical Synthesis.
+    * 🌊 **THE VIBE**: Market Stability Check.
+    * 📊 **THE SCORECARD**: Replacement-Level Math.
+    * 🧠 **GEMINI'S ANALYSIS**: Tactical Strategic Deep Dive.
     """)
 
 st.title("💥 BANG! Button")
@@ -39,24 +40,26 @@ def get_intel_audit(matchup, sport, market_type, target_team, fd_p, pin_p, edge,
     edge_label = "points" if market_type == "spreads" else "cents (Price Gap)"
     
     prompt = f"""
-    STRATEGIC INTEL AUDIT: {matchup} ({sport})
+    INTEL AUDIT: {matchup} ({sport})
     MARKET: {market_type} | TARGET: {target_team} {fd_p} (vs Pinnacle {pin_p})
     MATH EDGE: {edge} {edge_label}
     DATE: March 21, 2026
     
-    Provide a professional 3-pillar Strategic Audit:
+    You are a Strategic Betting Analyst. Provide a deep-dive audit using these 4 pillars:
     
     1. THE CATALYST: Identify the specific injury or roster move driving this market today.
-    2. THE SCORECARD: Identify the star player out and their LIKELY REPLACEMENT. 
+    2. THE VIBE: Is the market 'Stable' (priced in) or 'Fluid' (active move/crashing)?
+    3. THE SCORECARD: Identify the star player out and their LIKELY REPLACEMENT. 
        Calculate the 'Production Gap' using volume metrics:
        - NBA/NCAA B: Usage Rate & PPG.
        - NHL: Shots on Goal (SOG) & Time on Ice (TOI).
        - NFL/NCAA F: EPA per Play (QBs) or Targets/Air Yards (Skill).
-       Show the physical difference in stats (e.g., Star 22 PPG vs. Backup 4 PPG = -18 Gap).
-    3. GEMINI'S ANALYSIS: Perform a deep-dive bracket-style synthesis. Does the {edge} {edge_label} edge 
-       adequately cover the 'Production Gap' found in Pillar 2? Breakdown the tactical matchup (coaching/depth).
+       Compare Star vs. Replacement stats to show the 'hole' in the rotation.
+    4. GEMINI'S ANALYSIS: Perform a high-conviction strategic deep dive. Analyze the spread/price 
+       vs the roster reality. Does the {edge} {edge_label} edge cover the 'Production Gap' 
+       found in Pillar 3? Breakdown the coaching, depth, and situational edge like a tournament bracket analysis.
     
-    Be cold, analytical, and highly detailed. No generic fluff.
+    Be cold, analytical, and highly detailed in Pillar 4.
     """
     
     payload = {
@@ -90,15 +93,16 @@ opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
 st.divider()
 
-# 4. AUDIT SETTINGS (Specialized Markets)
+# 4. AUDIT SETTINGS (Specialized Markets & 10-Cent Base)
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_set1, col_set2 = st.columns([1, 1])
     with col_set1:
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min. Spread Edge (Points):", 0.5, 2.0, 0.5, 0.5)
-        min_ml_edge = st.slider("Min. NHL Moneyline Edge (Cents):", 5, 50, 10, 5)
+        # 10 cents is now the base (Min and Default)
+        min_ml_edge = st.slider("Min. NHL Moneyline Edge (Cents):", 10, 50, 10, 5)
     with col_set2:
-        st.write("**Leagues to Scan:**")
+        st.write("**Leagues & Specialized Markets:**")
         leagues_config = {
             "NBA": {"key": "basketball_nba", "market": "spreads"},
             "NHL": {"key": "icehockey_nhl", "market": "h2h"},
@@ -187,4 +191,4 @@ if st.session_state.scan_results:
                 st.markdown("### 📋 Strategic Intel Audit")
                 st.write(st.session_state[f"audit_text_{btn_key}"])
 else:
-    st.info("No games meet your Edge requirements.")
+    st.info("No games currently meet your Edge requirements.")
