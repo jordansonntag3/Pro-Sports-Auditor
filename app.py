@@ -221,7 +221,7 @@ with tab1:
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
                 c1, c2 = st.columns(2)
                 c1.metric("Market Edge", f"{res.get('Edge', 0):.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
-                if res['Market'] == 'h2h': c2.metric("Pinnacle Price", f"{res['PIN']}")
+                if res['Market'] == 'h2h': c2.metric("Pinnacle Price", to_american(res['PIN']))
                 
                 # SPECIAL PERMANENT LOGGING ROW
                 ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
