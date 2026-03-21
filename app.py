@@ -89,7 +89,8 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
     with col_a:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 2.0, 0.5, 0.5)
-        min_ml_edge = st.slider("Min NHL Moneyline Edge (cents):", 5, 50, 10, 5)
+        # RESTORED: 10 Cent Minimum
+        min_ml_edge = st.slider("Min NHL Moneyline Edge (cents):", 10, 50, 10, 5)
     with col_b:
         l_config = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
         selected = []
@@ -163,12 +164,12 @@ if st.session_state.scan_results:
             st.subheader(header)
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             
-            # THE SMART UI FIX: Only show PIN price for NHL
-            if res['Market'] == 'h2h': # NHL Moneyline
+            # THE SMART UI: Show PIN price only for NHL (ML)
+            if res['Market'] == 'h2h':
                 c1, c2 = st.columns(2)
                 c1.metric("Market Edge", f"{res['Edge']:.1f} cents")
                 c2.metric("Pinnacle Price", f"{res['PIN']}")
-            else: # Spreads (NBA/NFL/NCAA)
+            else:
                 st.metric("Spread Margin Edge", f"{res['Edge']:.1f} pts")
             
             ca, cb = st.columns(2)
