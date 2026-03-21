@@ -137,7 +137,6 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
                                 elif b['key'] == 'pinnacle': pin_h = v
 
                     if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
-                        # NHL CENTS CONVERSION: (Decimal - Decimal) * 100
                         if mkt == 'h2h':
                             edge_a, edge_h = (fd_a - pin_a) * 100, (fd_h - pin_h) * 100
                             floor = min_ml_edge - 0.01
@@ -152,9 +151,7 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
                         else: continue
 
                         new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
-        except Exception as e:
-            st.error(f"Error scanning {name}: {e}")
-            continue
+        except: continue
     st.session_state.scan_results = new_res
     status_text.text(f"Scan Complete: Found {len(new_res)} Value Plays.")
 
@@ -166,9 +163,13 @@ if st.session_state.scan_results:
             st.subheader(header)
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             
-            c1, c2 = st.columns(2)
-            c1.metric("Market Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
-            c2.metric("Pinnacle Price", f"{res['PIN']}")
+            # THE SMART UI FIX: Only show PIN price for NHL
+            if res['Market'] == 'h2h': # NHL Moneyline
+                c1, c2 = st.columns(2)
+                c1.metric("Market Edge", f"{res['Edge']:.1f} cents")
+                c2.metric("Pinnacle Price", f"{res['PIN']}")
+            else: # Spreads (NBA/NFL/NCAA)
+                st.metric("Spread Margin Edge", f"{res['Edge']:.1f} pts")
             
             ca, cb = st.columns(2)
             q_key, d_key = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
@@ -180,4 +181,4 @@ if st.session_state.scan_results:
             if q_key in st.session_state and isinstance(st.session_state[q_key], str): st.info(st.session_state[q_key])
             if d_key in st.session_state and isinstance(st.session_state[d_key], str): st.success(st.session_state[d_key])
 else:
-    st.info("No games currently meet your Edge requirements.")
+    st.info("No games meet your requirements for this time window.")
