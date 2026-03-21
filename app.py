@@ -31,7 +31,7 @@ with st.sidebar:
     * 🛑 **PASS**: High risk, low value.
     * ⚪ **NEUTRAL**: Market is efficient.
     * 🟢 **PLAY**: Solid math/roster edge.
-    * ⚡ **SMASH PLAY**: Massive, unpriced advantage.
+    * ⚡ **SMASH PLAY**: Rare, massive unpriced advantage.
     """)
 
 st.title("💥 BANG! Button")
@@ -50,15 +50,9 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "points" if market_type == "spreads" else "cents"
     
-    # 1. Check Ledger
     cached_news = st.session_state.search_ledger.get(matchup)
-    
-    # 2. Decide if we search
-    should_search = False
-    if grounding_mode == "Live Search": should_search = True
-    elif grounding_mode == "Session Cache Only" and not cached_news: should_search = True
+    should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
 
-    # 3. The Unified Prompt
     prompt = f"""
     SYSTEM ROLE: Strategic Betting Analyst.
     MATCHUP: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p})
@@ -67,7 +61,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     CONTEXT: {f'Use these Search Results: {cached_news}' if cached_news else 'Identify roster news and injuries for this game.'}
 
     TASK:
-    1. Perform a deep-dive tactical audit. Calculate 'Production Gap' (NBA/NCAA B: Usage/PPG; NHL: SOG/TOI; NFL: EPA/Targets).
+    1. Perform a tactical audit. Calculate 'Production Gap' (NBA/NCAA B: Usage/PPG; NHL: SOG/TOI).
     2. Synthesize the {edge} {edge_label} edge vs the production loss. 
     3. Determine a Verdict: 🛑 PASS, ⚪ NEUTRAL, 🟢 PLAY, or ⚡ SMASH PLAY.
 
@@ -78,11 +72,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     FORMAT: 1. Catalyst | 2. Vibe | 3. Scorecard | 4. Analysis | 5. Verdict.
     """
     
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}] 
-    }
-    
+    payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search:
         payload["tools"] = [{"google_search": {}}]
         time.sleep(1.5)
@@ -91,8 +81,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         try:
             response = requests.post(url, json=payload, timeout=30).json()
             if "error" in response:
-                if response['error']['code'] == 429:
-                    time.sleep(3); continue
+                if response['error']['code'] == 429: time.sleep(3); continue
                 return f"🛑 API ERROR: {response['error']['message']}"
             
             candidate = response.get('candidates', [{}])[0]
@@ -120,11 +109,11 @@ def load_opening_data():
 opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot:** `{csv_timestamp}`")
 
-# --- AUDIT SETTINGS ---
+# --- AUDIT SETTINGS (Restored Tomorrow Button) ---
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_a, col_b = st.columns([1, 1])
     with col_a:
-        horizon = st.radio("Window:", ["Today", "Next 48 Hours"], horizontal=True)
+        horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 2.0, 0.5, 0.5)
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 50, 10, 5)
     with col_b:
@@ -142,12 +131,19 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
 if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
     new_res = []
     now_utc = datetime.utcnow()
-    t_to = (now_utc + timedelta(hours=18 if horizon=="Today" else 48)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    
+    # Precise Time Window Logic
+    if horizon == "Today":
+        t_from, t_to = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'), (now_utc + timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    elif horizon == "Tomorrow":
+        t_from, t_to = (now_utc + timedelta(hours=18)).strftime('%Y-%m-%dT%H:%M:%SZ'), (now_utc + timedelta(hours=42)).strftime('%Y-%m-%dT%H:%M:%SZ')
+    else: # Next 48 Hours
+        t_from, t_to = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'), (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     for name in selected:
         s_key, mkt = l_config[name]
         url = f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/"
-        params = {"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle", "commenceTimeTo": t_to}
+        params = {"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": t_from, "commenceTimeTo": t_to}
         try:
             data = requests.get(url, params=params).json()
             if isinstance(data, list):
@@ -186,6 +182,7 @@ if st.session_state.scan_results:
             st.subheader(f"{res['Target']}")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             
+            # CONSISTENT VARIABLE NAMES: res['Edge'] and res['PIN']
             c1, c2 = st.columns(2)
             c1.metric(f"{'Spread' if res['Market']=='spreads' else 'Price'} Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
             c2.metric("Pinnacle Price", f"{res['PIN']}")
@@ -198,10 +195,9 @@ if st.session_state.scan_results:
             if cb.button(f"🔎 Detailed Intel", key=f"btn_{d_key}"):
                 st.session_state[d_key] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target_Raw'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="detailed")
             
-            # String Check: Ensures we only display text, preventing the "False" bug
             if q_key in st.session_state and isinstance(st.session_state[q_key], str): 
                 st.info(f"⚡ **Quick Summary:**\n\n{st.session_state[q_key]}")
             if d_key in st.session_state and isinstance(st.session_state[d_key], str): 
                 st.success(f"🔎 **Full Strategic Audit:**\n\n{st.session_state[d_key]}")
 else:
-    st.info("No games meet your Edge requirements.")
+    st.info("No games meet your requirements for this time window.")
