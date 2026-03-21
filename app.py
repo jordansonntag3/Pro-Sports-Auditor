@@ -13,10 +13,25 @@ with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
     
-    if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
+    # Connection Tester
+    if st.button("🔔 Test Syndicate Link", use_container_width=True):
+        test_url = st.secrets.get("DISCORD_LIVE_URL")
+        if test_url:
+            try:
+                requests.post(test_url, json={"content": "✅ **SYNDICATE CONNECTION TEST.** Streamlit is talking to Discord."})
+                st.success("Test ping sent!")
+            except: st.error("Failed to send.")
+        else: st.error("Secret 'DISCORD_LIVE_URL' not found.")
+
+    # UPDATED: SMART RESET (Protects your logged bets)
+    if st.button("🔄 RESET SCANNER & CACHE", use_container_width=True):
         st.cache_data.clear()
+        # We only delete the scanner/intel keys, NOT 'bet_history'
+        keys_to_keep = ['bet_history', 'active_NBA', 'active_NHL', 'active_NCAA B', 'active_NFL', 'active_NCAA F']
         for key in list(st.session_state.keys()):
-            del st.session_state[key]
+            if key not in keys_to_keep:
+                del st.session_state[key]
+        st.success("Scanner & Intel Wiped. Ledger Preserved.")
         st.rerun()
         
     st.divider()
@@ -41,29 +56,22 @@ discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
 # --- UTILITY: DISCORD SYNDICATE FEED ---
 def send_discord_live(messages):
     if discord_live_url and messages:
-        payload = {"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(messages)}
+        payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
         requests.post(discord_live_url, json=payload)
 
-# --- MASTER INTELLIGENCE (Fixed mode logic) ---
+# --- MASTER INTELLIGENCE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
 
-    # STRICT CONSTRAINTS based on mode
     if mode == "quick":
-        format_instruction = "Provide a high-density 1-2 sentence summary ONLY. Focus on the single biggest factor (injury or fatigue) and give a final Verdict."
+        format_rules = "MAX 2 SENTENCES. Concise reason (injury/fatigue) + Verdict."
     else:
-        format_instruction = "Provide a comprehensive structured breakdown: 1. Injury/Roster Audit. 2. Fatigue/Schedule Impact. 3. Line Movement Analysis. 4. Final Strategic Recommendation."
+        format_rules = "Structured breakdown: 1. Roster, 2. Fatigue, 3. Verdict. Use bullet points."
 
-    prompt = f"""
-    SYSTEM ROLE: Strategic Betting Analyst.
-    GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p})
-    MATH EDGE: {edge} {edge_label}
-    
-    TASK: {format_instruction}
-    """
+    prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {format_rules}"
     
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search: 
@@ -102,11 +110,9 @@ with tab1:
                     st.rerun()
                 if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
-    # RENAME: "RUN STRATEGIC SCAN" -> "RUN SCAN"
     if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []
         discord_messages = []
-        now_utc = datetime.utcnow()
         
         RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
         try: op_df = pd.read_csv(f"{RAW_URL}?v={time.time()}")
@@ -156,7 +162,6 @@ with tab1:
                                     elif mov <= 0.5: vibe = "⚓"
                                 except: pass
 
-                            # ALERT DEDUPING LOGIC
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
                             alert_fingerprint = f"{t_team}_{fd_p}_{name}"
                             
@@ -171,7 +176,7 @@ with tab1:
         st.session_state.scan_results = new_res
         if discord_messages:
             send_discord_live(discord_messages)
-            st.toast(f"Pushed {len(discord_messages)} alerts to Discord!")
+            st.toast(f"Pushed {len(discord_messages)} values to Syndicate!")
 
     if st.session_state.scan_results:
         for res in st.session_state.scan_results:
@@ -201,6 +206,8 @@ with tab1:
 with tab2:
     st.header("📊 Performance Ledger")
     if st.session_state.bet_history:
-        st.dataframe(pd.DataFrame(st.session_state.bet_history), use_container_width=True)
+        # Show recent first
+        df = pd.DataFrame(st.session_state.bet_history)
+        st.dataframe(df.iloc[::-1], use_container_width=True)
     else:
-        st.info("No plays logged yet.")
+        st.info("No plays logged yet. Use the ✅ LOG button to track picks.")
