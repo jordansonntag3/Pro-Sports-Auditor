@@ -8,14 +8,13 @@ from io import StringIO
 # 1. Page Configuration
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
-# 2. Sidebar - Quota & System Controls
+# 2. Sidebar - Quota & Vibe Controls
 with st.sidebar:
-    st.header("⚙️ System Controls")
+    st.header("⚙️ Precision Controls")
     grounding_mode = st.radio(
         "Grounding Mode:",
         ["Live Search", "Session Cache Only", "Math Only"],
-        index=1,
-        help="Math Only saves API tokens by skipping the Google Search step."
+        index=1
     )
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
@@ -23,10 +22,10 @@ with st.sidebar:
         st.rerun()
     st.divider()
     st.markdown("""
-    **Vibe Speedometer:**
-    * 🚀 **Velocity**: Big movement (>2.0 pts).
-    * ⚓ **Stable**: Sharp/FanDuel Alignment (<0.5).
-    * 🌊 **Drift**: Standard market noise.
+    **Vibe Speedometer (Recalibrated):**
+    * 🚀 **Velocity**: Movement >1.0 pt from Opening.
+    * ⚓ **Stable**: Within 0.5 pt of Opening.
+    * 🌊 **Drift**: Standard Market Activity.
     """)
 
 st.title("💥 BANG! Button")
@@ -44,7 +43,7 @@ for league in leagues_list:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- MASTER INTELLIGENCE CORE (Deep-to-Brief) ---
+# --- MASTER INTELLIGENCE CORE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
@@ -62,8 +61,8 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     2. Reach a Verdict: 🛑 PASS, ⚪ NEUTRAL, 🟢 PLAY, or ⚡ SMASH PLAY.
     
     OUTPUT: {mode.upper()} mode. 
-    Quick: High-density 1-2 sentence summary + Verdict.
-    Detailed: Full, unsummarized strategic deep dive + Verdict.
+    Quick: 1-2 dense sentence summary + Verdict.
+    Detailed: Full tactical deep dive + Verdict.
     """
     
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
@@ -76,7 +75,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         if grounding and not cached_news:
             st.session_state.search_ledger[matchup] = str(grounding.get('searchEntryPoint', ''))
         return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Analysis Found.').strip()
-    except: return "⚠️ API LIMIT REACHED - TAKE A BREATHER"
+    except: return "⚠️ API LIMIT REACHED"
 
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
@@ -92,15 +91,15 @@ def load_opening_data():
     except: return pd.DataFrame(), "Error"
 
 opening_df, csv_timestamp = load_opening_data()
-st.markdown(f"**🕒 Market Snapshot (CST):** `{csv_timestamp}`")
+st.markdown(f"**🕒 Market Snapshot:** `{csv_timestamp}`")
 
-# --- AUDIT SETTINGS (Big Buttons & Tight Sliders) ---
+# --- AUDIT SETTINGS (New Precision Capping) ---
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_set1, col_set2 = st.columns([1, 1.2])
     
     with col_set1:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-        # Precision Capped: 1.0 Spread / 20 Cents ML
+        # Precision Capped: 1.0 Spread / 20 Cents NHL
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.0, 0.5, 0.5)
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 20, 10, 5)
     
@@ -166,13 +165,14 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
                             t_team, edge, fd_p, pin_p = home_t, edge_h, fd_h, pin_h
                         else: continue
                         
+                        # RECALIBRATED VIBE LOGIC
                         vibe = "🌊"
                         if not opening_df.empty:
                             try:
                                 opening_row = opening_df[opening_df['Team'] == t_team].iloc[-1]
                                 mov = abs(fd_p - opening_row['Opening_Line'])
-                                if mov >= 2.0: vibe = "🚀"
-                                elif mov <= 0.5: vibe = "⚓"
+                                if mov > 1.0: vibe = "🚀" # Trigger at 1.0 instead of 2.0
+                                elif mov < 0.5: vibe = "⚓" # Confirm it's the opening price
                             except: pass
 
                         new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
@@ -183,15 +183,17 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
 if st.session_state.scan_results:
     for res in st.session_state.scan_results:
         with st.container(border=True):
-            # SAFETY GET: Prevents KeyError if session is stale
             v = res.get('Vibe', '🌊')
             h = f"{v} {res['Target']} ({'+' if res['Market']=='spreads' and res['FD'] > 0 else ''}{res['FD']})" if res['Market']=='spreads' else f"{v} {res['Target']} (ML)"
             st.subheader(h)
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             
             c1, c2 = st.columns(2)
+            # Standardized Edge Display
             c1.metric("Market Edge", f"{res.get('Edge', 0):.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
-            if res['Market'] == 'h2h': c2.metric("Pinnacle Price", f"{res['PIN']}")
+            # Smart UI: Only show Pinnacle Price for NHL (ML)
+            if res['Market'] == 'h2h':
+                c2.metric("Pinnacle Price", f"{res['PIN']}")
             
             ca, cb = st.columns(2)
             q_k, d_k = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
