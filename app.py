@@ -32,25 +32,26 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE (The Price Integrity Audit) ---
-def get_forensic_audit(matchup, target_team, edge, velocity, _key):
-    # Using Lite for 1,000 RPD quota stability
+# --- AI INTELLIGENCE (The "Anchored" Price Audit) ---
+def get_forensic_audit(matchup, target_team, fd_price, pin_price, edge, velocity, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
+    # NEW: We pass the EXACT prices into the prompt so the AI can't hallucinate the consensus.
     prompt = f"""
     PRICE INTEGRITY AUDIT: {matchup}
-    TARGET: {target_team} | MATH EDGE: {edge} pts | VELOCITY: {velocity} pts
-    DATE: March 20, 2026
+    FANDUEL: {target_team} {fd_price}
+    PINNACLE: {target_team} {pin_price}
+    MATH EDGE: {edge} pts | VELOCITY: {velocity} pts
     
-    You are a Quantitative Market Analyst. DO NOT explain why a team is 'good' or 'better'. 
-    Focus ONLY on the Spread Price Efficiency.
+    You are a Quantitative Market Analyst. 
+    FACT: FanDuel is offering {edge} points of value compared to Pinnacle's sharp line.
     
-    1. NEWS ANCHOR: Search for news (injuries/lineups) for today. Does news justify why FanDuel is {edge} pts away from Pinnacle?
-    2. SPREAD INTEGRITY: Is FanDuel's price a 'Market Outlier'? (e.g., if FD is at +14.5 and the consensus/Pinnacle is +13.5, analyze the mathematical value of that 1.0 point cushion).
-    3. MARKET FLOOR: Is the price stable at Pinnacle ('The Sharp Standard'), or is the line 'accelerating' toward a new number?
+    1. NEWS ANCHOR: Search for news (injuries/lineups) for March 20, 2026. Does news explain why Pinnacle is at {pin_price} while FanDuel is still at {fd_price}?
+    2. SPREAD INTEGRITY: Analyze the value of this specific {edge}-point 'hook'. Is the 0.5-1.0 point difference a true book inefficiency or just a 'news lag'?
+    3. MARKET FLOOR: Is Pinnacle's {pin_price} stable, or is the market still moving away from this number?
     
-    FINAL SIGNAL: Categorize as 🟢 PURE VALUE, 🟡 CAUTION, or 🔴 STALE/TRAP.
-    Format as a concise bulleted list. Be cold, analytical, and math-focused.
+    FINAL SIGNAL: 🟢 PURE VALUE, 🟡 CAUTION, or 🔴 STALE.
+    Be cold and analytical. Do not discuss team 'strength'—only the price mismatch.
     """
     
     payload = {
@@ -88,19 +89,14 @@ st.divider()
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
     col_set1, col_set2 = st.columns([1, 1])
     with col_set1:
-        view_mode = st.radio("View Mode:", ["Mobile Cards", "Desktop Table"], horizontal=True)
         horizon = st.radio("Scan Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_edge = st.slider("Min. Price Edge (Hard Floor):", 0.5, 2.0, 0.5, 0.5)
     with col_set2:
         st.write("**Leagues to Scan:**")
         leagues_master = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
         c1, c2, c3 = st.columns(3)
-        # ALL CHECKED BY DEFAULT
-        do_nba = c1.checkbox("NBA", value=True)
-        do_nhl = c2.checkbox("NHL", value=True)
-        do_ncaab = c3.checkbox("NCAA B", value=True)
-        do_nfl = c1.checkbox("NFL", value=True)
-        do_ncaaf = c2.checkbox("NCAA F", value=True)
+        do_nba, do_nhl, do_ncaab = c1.checkbox("NBA", value=True), c2.checkbox("NHL", value=True), c3.checkbox("NCAA B", value=True)
+        do_nfl, do_ncaaf = c1.checkbox("NFL", value=True), c2.checkbox("NCAA F", value=True)
         
         selected_keys = []
         if do_nba: selected_keys.append(("NBA", leagues_master["NBA"]))
@@ -132,8 +128,15 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                                 elif book['key'] == 'pinnacle': pin_away = o.get('point')
 
                     if fd_away is not None and pin_away is not None:
-                        t_team, edge, side = (away_t, fd_away - pin_away, "away") if fd_away > pin_away else (home_t, pin_away - fd_away, "home")
-                        # --- THE IRONCLAD FLOOR ---
+                        # Which team are we betting on?
+                        if fd_away > pin_away:
+                            t_team, edge, side = away_t, fd_away - pin_away, "away"
+                            fd_p, pin_p = fd_away, pin_away
+                        else:
+                            t_team, edge, side = home_t, pin_away - fd_away, "home"
+                            # Point check for home teams (usually negative)
+                            fd_p, pin_p = -fd_away, -pin_away
+
                         if edge < (min_edge - 0.01): continue
                         
                         m_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
@@ -147,8 +150,9 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                         total_score = edge + vel_val
                         if total_score >= 0.49:
                             new_results.append({
-                                "Target": f"{t_team} {'+' if fd_away > 0 else ''}{fd_away if side=='away' else -fd_away}",
-                                "Target_Raw": t_team, "Edge_Raw": edge, "Vel_Raw": vel_val,
+                                "Target": f"{t_team} {'+' if fd_p > 0 else ''}{fd_p}",
+                                "Target_Raw": t_team, "FD_Price": fd_p, "PIN_Price": pin_p,
+                                "Edge_Raw": edge, "Vel_Raw": vel_val,
                                 "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
                                 "Velocity": f"{vel_val:+.1f}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}"
                             })
@@ -168,11 +172,12 @@ if st.session_state.scan_results:
             
             if st.button(f"🔎 Run Price Audit", key=f"intel_{res['Matchup']}"):
                 with st.spinner("Analyzing Market Alignment..."):
-                    audit = get_forensic_audit(res['Matchup'], res['Target_Raw'], res['Edge_Raw'], res['Vel_Raw'], gemini_key)
+                    # PASSING FD AND PIN PRICES DIRECTLY TO AI
+                    audit = get_forensic_audit(res['Matchup'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], res['Vel_Raw'], gemini_key)
                     st.session_state[f"audit_{res['Matchup']}"] = audit
             
-            if f"audit_{res['Matchup']}" in st.session_state:
+            if f"audit_{res['audit_' + res['Matchup']]}" in st.session_state or f"audit_{res['Matchup']}" in st.session_state:
                 st.markdown("### 🕵️ Price Integrity Audit")
-                st.write(st.session_state[f"audit_{res['Matchup']}"])
+                st.write(st.session_state.get(f"audit_{res['Matchup']}", "Audit Pending..."))
 else:
     st.info(f"No games meet the {min_edge} Edge requirement.")
