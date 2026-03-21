@@ -215,7 +215,7 @@ with tab1:
 
                             new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
-        st.session_state.scan_results = new_res
+        st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
         if discord_messages: send_discord_live(discord_messages)
 
     if st.session_state.scan_results:
