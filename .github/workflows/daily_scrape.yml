@@ -2,13 +2,13 @@ name: Daily Opening Lines Scraper
 
 on:
   schedule:
-    # 07:00 UTC = 2:00 AM CDT. 
-    # Accounts for the ~2hr GitHub free tier delay to hit 4:00 AM Des Moines time.
+    # 07:00 UTC is 2:00 AM CDT. 
+    # Accounts for the ~2hr runner lag to hit 4:00 AM Des Moines time.
     - cron: '0 7 * * *'
   workflow_dispatch: 
 
 permissions:
-  contents: write  # Grants the bot permission to save the CSV back to the repo
+  contents: write
 
 jobs:
   scrape:
@@ -17,9 +17,7 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4.2.2 
         with:
-          # Uses your VIP token to sign the commit
-          token: ${{ secrets.SCRAPER_TOKEN }}
-          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -35,9 +33,10 @@ jobs:
         run: python scraper.py
 
       - name: Push CSV Changes
-        # This action automatically handles the Git config and "Write" permissions
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "Automated update: 4:00 AM Opening Lines (Lag-Adjusted)"
+          commit_message: "Automated update: 4:00 AM Opening Lines"
           file_pattern: 'opening_lines.csv'
           branch: main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
