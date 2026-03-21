@@ -15,10 +15,8 @@ with st.sidebar:
     
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
-        # Clean out all session data including alert history
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.success("System & Alert Registry Reset.")
         st.rerun()
         
     st.divider()
@@ -30,7 +28,7 @@ st.title("💥 BANG! Button")
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
-if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set() # Deduping Registry
+if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -43,22 +41,30 @@ discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
 # --- UTILITY: DISCORD SYNDICATE FEED ---
 def send_discord_live(messages):
     if discord_live_url and messages:
-        payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
+        payload = {"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(messages)}
         requests.post(discord_live_url, json=payload)
 
-# --- MASTER INTELLIGENCE ---
+# --- MASTER INTELLIGENCE (Fixed mode logic) ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
 
+    # STRICT CONSTRAINTS based on mode
+    if mode == "quick":
+        format_instruction = "Provide a high-density 1-2 sentence summary ONLY. Focus on the single biggest factor (injury or fatigue) and give a final Verdict."
+    else:
+        format_instruction = "Provide a comprehensive structured breakdown: 1. Injury/Roster Audit. 2. Fatigue/Schedule Impact. 3. Line Movement Analysis. 4. Final Strategic Recommendation."
+
     prompt = f"""
     SYSTEM ROLE: Strategic Betting Analyst.
     GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p})
     MATH EDGE: {edge} {edge_label}
-    INSTRUCTIONS: 1. Audit Goalie/Fatigue. 2. Compare movement vs opening. 3. Final Verdict.
+    
+    TASK: {format_instruction}
     """
+    
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search: 
         payload["tools"] = [{"google_search": {}}]
@@ -96,12 +102,12 @@ with tab1:
                     st.rerun()
                 if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
-    if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
+    # RENAME: "RUN STRATEGIC SCAN" -> "RUN SCAN"
+    if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []
         discord_messages = []
         now_utc = datetime.utcnow()
         
-        # Load Opening Lines for Vibe Meter
         RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
         try: op_df = pd.read_csv(f"{RAW_URL}?v={time.time()}")
         except: op_df = pd.DataFrame()
@@ -152,7 +158,6 @@ with tab1:
 
                             # ALERT DEDUPING LOGIC
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
-                            # Unique key: Team + Line + Sport (e.g., "Dallas_1.0_NBA")
                             alert_fingerprint = f"{t_team}_{fd_p}_{name}"
                             
                             if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
@@ -166,7 +171,7 @@ with tab1:
         st.session_state.scan_results = new_res
         if discord_messages:
             send_discord_live(discord_messages)
-            st.toast(f"Pushed {len(discord_messages)} new values to Discord Syndicate!")
+            st.toast(f"Pushed {len(discord_messages)} alerts to Discord!")
 
     if st.session_state.scan_results:
         for res in st.session_state.scan_results:
@@ -198,4 +203,4 @@ with tab2:
     if st.session_state.bet_history:
         st.dataframe(pd.DataFrame(st.session_state.bet_history), use_container_width=True)
     else:
-        st.info("No plays logged yet. Use the ✅ LOG button on the scanner to track your picks.")
+        st.info("No plays logged yet.")
