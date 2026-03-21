@@ -8,21 +8,18 @@ from io import StringIO
 # 1. Page Configuration
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
-# 2. Sidebar - Precision Controls
+# 2. Sidebar - Quota & Vibe Controls
 with st.sidebar:
     st.header("⚙️ Precision Controls")
     grounding_mode = st.radio(
         "Grounding Mode:",
         ["Live Search", "Session Cache Only", "Math Only"],
-        index=1,
-        help="Use 'Math Only' to save API tokens if you know the news."
+        index=1
     )
-    
     if st.button("🔄 Reset System", use_container_width=True):
         st.cache_data.clear()
         st.session_state.clear()
         st.rerun()
-    
     st.divider()
     st.markdown("""
     **Vibe Meter Guide:**
@@ -33,8 +30,15 @@ with st.sidebar:
 
 st.title("💥 BANG! Button")
 
+# 3. Session State Initialization
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
+
+# League Toggle State Initialization
+leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
+for league in leagues_list:
+    if f"active_{league}" not in st.session_state:
+        st.session_state[f"active_{league}"] = True # Default all to ON
 
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
@@ -56,8 +60,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
 
     TASK:
     1. Perform tactical audit & calculate 'Production Gap'.
-    2. Synthesize the {edge} {edge_label} edge vs the news. 
-    3. Determine a Verdict: 🛑 PASS, ⚪ NEUTRAL, 🟢 PLAY, or ⚡ SMASH PLAY.
+    2. Reach a Verdict: 🛑 PASS, ⚪ NEUTRAL, 🟢 PLAY, or ⚡ SMASH PLAY.
 
     OUTPUT: {mode.upper()} mode. 
     Quick: 1-2 dense sentences per section + Verdict.
@@ -74,7 +77,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         if grounding and not cached_news:
             st.session_state.search_ledger[matchup] = str(grounding.get('searchEntryPoint', ''))
         return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
-    except: return "⚠️ API LIMIT REACHED / CONNECTION ERROR"
+    except: return "⚠️ API LIMIT REACHED"
 
 # --- DATA LOADING ---
 @st.cache_data(ttl=300)
@@ -92,25 +95,39 @@ def load_opening_data():
 opening_df, csv_timestamp = load_opening_data()
 st.markdown(f"**🕒 Market Snapshot:** `{csv_timestamp}`")
 
-# --- AUDIT SETTINGS (New Precision Bounds) ---
+# --- AUDIT SETTINGS (New Big Toggle Buttons) ---
 with st.expander("🛠️ Audit & Display Settings", expanded=True):
-    col_a, col_b = st.columns([1, 1])
+    col_a, col_b = st.columns([1, 1.2])
+    
     with col_a:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-        # Precision Bound: Max 1.0
+        # Precision Bounds: Spread 1.0 / Cents 20
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.0, 0.5, 0.5)
-        # Precision Bound: Max 20
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 20, 10, 5)
+    
     with col_b:
-        st.write("**Leagues to Scan:**")
-        l_config = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
-        selected = []
+        st.write("**League Toggles (Active Targets):**")
+        # Creating a 3x2 grid for Big Toggle Buttons
         c1, c2, c3 = st.columns(3)
-        if c1.checkbox("NBA", value=True): selected.append("NBA")
-        if c2.checkbox("NHL", value=True): selected.append("NHL")
-        if c3.checkbox("NCAA B", value=True): selected.append("NCAA B")
-        if c1.checkbox("NFL", value=True): selected.append("NFL")
-        if c2.checkbox("NCAA F", value=True): selected.append("NCAA F")
+        cols = [c1, c2, c3, c1, c2] # Distribute buttons
+        
+        selected_leagues = []
+        l_mapping = {
+            "NBA": ("basketball_nba", "spreads"), 
+            "NHL": ("icehockey_nhl", "h2h"), 
+            "NCAA B": ("basketball_ncaab", "spreads"), 
+            "NFL": ("americanfootball_nfl", "spreads"), 
+            "NCAA F": ("americanfootball_ncaaf", "spreads")
+        }
+        
+        for i, league in enumerate(leagues_list):
+            is_active = st.session_state[f"active_{league}"]
+            label = f"✅ {league}" if is_active else f"⬜ {league}"
+            if cols[i].button(label, key=f"toggle_{league}", use_container_width=True):
+                st.session_state[f"active_{league}"] = not is_active
+                st.rerun()
+            if st.session_state[f"active_{league}"]:
+                selected_leagues.append(league)
 
 # --- SCANNING ENGINE ---
 if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
@@ -124,8 +141,8 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
     else:
         t_from, t_to = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ'), (now_utc + timedelta(hours=48)).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    for name in selected:
-        s_key, mkt = l_config[name]
+    for name in selected_leagues:
+        s_key, mkt = l_mapping[name]
         url = f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/"
         params = {"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle", "commenceTimeFrom": t_from, "commenceTimeTo": t_to}
         try:
@@ -159,8 +176,8 @@ if st.button("🚀 RUN STRATEGIC SCAN", use_container_width=True):
                             t_team, edge, fd_p, pin_p = home_t, edge_h, fd_h, pin_h
                         else: continue
                         
-                        # Vibe Logic: Compare Current FD to Opening FD
-                        vibe = "🌊" # Default
+                        # Vibe Logic
+                        vibe = "🌊"
                         if not opening_df.empty:
                             try:
                                 opening_row = opening_df[opening_df['Team'] == t_team].iloc[-1]
@@ -197,4 +214,4 @@ if st.session_state.scan_results:
             if q_key in st.session_state: st.info(st.session_state[q_key])
             if d_key in st.session_state: st.success(st.session_state[d_key])
 else:
-    st.info("No games meet your requirements for this time window.")
+    st.info("No games meet your precision requirements for this window.")
