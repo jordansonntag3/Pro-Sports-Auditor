@@ -14,14 +14,14 @@ with st.sidebar:
     if st.button("🔄 Clear System Cache", use_container_width=True):
         st.cache_data.clear()
         st.session_state.scan_results = []
-        st.success("Global Cache Wiped.")
+        st.success("Briefing Logic Reset.")
         st.rerun()
     st.divider()
     st.markdown("""
-    **Signal Strength:**
-    * 🟢 **PURE VALUE**: Stable market, FD is lagging.
-    * 🟡 **CAUTION**: News is fresh, market is moving.
-    * 🔴 **STALE**: The edge is a 'falling knife'.
+    **The Lunch Break Framework:**
+    * 🔍 **THE CATALYST**: Why is the line moving?
+    * 🌊 **THE VIBE**: Is the market stable or crashing?
+    * 📊 **THE SCORECARD**: Points lost vs. Points gained.
     """)
 
 st.title("💥 BANG! Button")
@@ -32,25 +32,26 @@ if "scan_results" not in st.session_state:
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 
-# --- AI INTELLIGENCE (The "Anchored" Price Audit) ---
-def get_forensic_audit(matchup, target_team, fd_price, pin_price, edge, velocity, _key):
+# --- AI INTELLIGENCE (The Lunch Break Briefing) ---
+def get_lunch_break_briefing(matchup, target_team, fd_price, pin_price, edge, _key):
+    # Using the Lite model for high-quota stability
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     prompt = f"""
-    PRICE INTEGRITY AUDIT: {matchup}
-    TARGET: {target_team} | MATH EDGE: {edge} pts | VELOCITY: {velocity} pts
+    LUNCH BREAK BRIEFING: {matchup}
+    TARGET: {target_team} {fd_price} (vs Pinnacle {pin_price})
+    MATH EDGE: {edge} points
+    DATE: March 20, 2026
     
-    FACTS (Source of Truth):
-    - FANDUEL: {target_team} {fd_price}
-    - PINNACLE: {target_team} {pin_price}
+    You are a casual betting analyst providing a 3-pillar briefing.
     
-    As a Quantitative Analyst, use Google Search to find news (injuries/roster) for March 20, 2026. 
-    1. NEWS ANCHOR: Does roster news justify why Pinnacle is at {pin_price}?
-    2. PRICE OUTLIER: Is FanDuel's {fd_price} a 'lazy book' lag or a 'news trap'?
-    3. MARKET FLOOR: Is the {pin_price} line stable or still 'crashing' toward a new number?
+    1. THE CATALYST: In 1 sentence, what is the 'News Anchor' (injury, rest, or sharp move) for today?
+    2. THE VIBE: Is the market 'Stable' (news is old/priced in) or 'Fluid' (line is crashing/moving fast)?
+    3. THE SCORECARD: Identify the key player out/returning. Calculate the 'Production Gap' by subtracting their PPG from their replacement's PPG. 
+       (e.g., Star [15 PPG] out, Backup [5 PPG] in = -10.0 Production Gap). 
+       Include one relevant 'Talking Head' quote or deep stat if found.
     
-    FINAL SIGNAL: 🟢 PURE VALUE, 🟡 CAUTION, or 🔴 STALE.
-    Be cold and analytical. Do not discuss team 'strength'—only the price mismatch.
+    Format as 3 bulleted sections. Keep it conversational but data-driven.
     """
     
     payload = {
@@ -63,7 +64,7 @@ def get_forensic_audit(matchup, target_team, fd_price, pin_price, edge, velocity
         response = requests.post(url, json=payload, timeout=30).json()
         if "error" in response: return "🛑 API Limit Reached."
         parts = response.get('candidates', [{}])[0].get('content', {}).get('parts', [])
-        return parts[0]['text'].strip() if parts else "🔍 No forensic data found."
+        return parts[0]['text'].strip() if parts else "🔍 No briefing data found."
     except: return "⚠️ CONNECTION ERROR"
 
 # --- LIVE DATA LOADING ---
@@ -94,7 +95,7 @@ with st.expander("🛠️ Audit & Display Settings", expanded=True):
         st.write("**Leagues to Scan:**")
         leagues_master = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
         c1, c2, c3 = st.columns(3)
-        do_nba, do_nhl, do_ncaab = c1.checkbox("NBA", value=True), c2.checkbox("NHL", value=True), c3.checkbox("NCAA B", value=True)
+        do_nba, do_nhl, do_ncaab = [c.checkbox(n, value=True) for c, n in zip([c1, c2, c3], ["NBA", "NHL", "NCAA B"])]
         do_nfl, do_ncaaf = c1.checkbox("NFL", value=True), c2.checkbox("NCAA F", value=True)
         
         selected_keys = []
@@ -118,29 +119,23 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
             if isinstance(data, list):
                 for game in data:
                     away_t, home_t = game.get('away_team'), game.get('home_team')
-                    fd_away, pin_away = None, None
-                    fd_home, pin_home = None, None
+                    fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for book in game.get('bookmakers', []):
-                        mkts = book.get('markets', [{}])[0].get('outcomes', [])
-                        for o in mkts:
-                            if o.get('name') == away_t:
-                                if book['key'] == 'fanduel': fd_away = o.get('point')
-                                elif book['key'] == 'pinnacle': pin_away = o.get('point')
-                            if o.get('name') == home_t:
-                                if book['key'] == 'fanduel': fd_home = o.get('point')
-                                elif book['key'] == 'pinnacle': pin_home = o.get('point')
+                        for o in book.get('markets', [{}])[0].get('outcomes', []):
+                            if o['name'] == away_t:
+                                if book['key'] == 'fanduel': fd_a = o['point']
+                                elif book['key'] == 'pinnacle': pin_a = o['point']
+                            if o['name'] == home_t:
+                                if book['key'] == 'fanduel': fd_h = o['point']
+                                elif book['key'] == 'pinnacle': pin_h = o['point']
 
-                    if fd_away is not None and pin_away is not None:
-                        # MATH: Which side gives the bettor the better number?
-                        edge_away = fd_away - pin_away
-                        edge_home = fd_home - pin_home
+                    if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
+                        edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
                         
-                        if edge_away > edge_home and edge_away >= (min_edge - 0.01):
-                            t_team, edge, side = away_t, edge_away, "away"
-                            fd_p, pin_p = fd_away, pin_away
-                        elif edge_home >= (min_edge - 0.01):
-                            t_team, edge, side = home_t, edge_home, "home"
-                            fd_p, pin_p = fd_home, pin_home
+                        if edge_a > edge_h and edge_a >= (min_edge - 0.01):
+                            t_team, edge, side, fd_p, pin_p = away_t, edge_a, "away", fd_a, pin_a
+                        elif edge_h >= (min_edge - 0.01):
+                            t_team, edge, side, fd_p, pin_p = home_t, edge_h, "home", fd_h, pin_h
                         else: continue
                         
                         m_key = f"{sorted([away_t, home_t])[0]} vs {sorted([away_t, home_t])[1]}"
@@ -149,17 +144,15 @@ if st.button("🚀 RUN SCAN", use_container_width=True):
                             hist = opening_df[opening_df['Matchup'] == m_key]
                             if not hist.empty:
                                 pin_open_away = hist.iloc[0]['Open_Pinnacle']
-                                vel_val = (pin_away - pin_open_away) if side == "away" else -(pin_away - pin_open_away)
+                                vel_val = (pin_a - pin_open_away) if side == "away" else -(pin_a - pin_open_away)
 
-                        total_score = edge + vel_val
-                        if total_score >= 0.49:
-                            new_results.append({
-                                "Target": f"{t_team} {'+' if fd_p > 0 else ''}{fd_p}",
-                                "Target_Raw": t_team, "FD_Price": fd_p, "PIN_Price": pin_p,
-                                "Edge_Raw": edge, "Vel_Raw": vel_val, "Matchup": f"{away_t} @ {home_t}", 
-                                "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
-                                "Velocity": f"{vel_val:+.1f}", "Edge": f"{edge:.1f}", "Score": f"{total_score:.1f}"
-                            })
+                        new_results.append({
+                            "Target": f"{t_team} {'+' if fd_p > 0 else ''}{fd_p}",
+                            "Target_Raw": t_team, "FD_Price": fd_p, "PIN_Price": pin_p,
+                            "Edge_Raw": edge, "Vel_Raw": vel_val, "Matchup": f"{away_t} @ {home_t}", 
+                            "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p'),
+                            "Velocity": f"{vel_val:+.1f}", "Edge": f"{edge:.1f}", "Score": f"{(edge + vel_val):.1f}"
+                        })
         except: continue
     st.session_state.scan_results = new_results
 
@@ -174,13 +167,14 @@ if st.session_state.scan_results:
             m2.metric("Market Velocity", f"{res['Velocity']} pts")
             m3.metric("Combined Score", f"{res['Score']}")
             
-            if st.button(f"🔎 Run Price Audit", key=f"audit_btn_{res['Matchup']}"):
-                with st.spinner("Analyzing Market Alignment..."):
-                    audit_res = get_forensic_audit(res['Matchup'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], res['Vel_Raw'], gemini_key)
-                    st.session_state[f"audit_text_{res['Matchup']}"] = audit_res
+            btn_key = f"brief_{res['Matchup']}_{res['Target_Raw']}"
+            if st.button(f"☕ Get Lunch Break Briefing", key=btn_key):
+                with st.spinner("Preparing your 3-pillar briefing..."):
+                    brief = get_lunch_break_briefing(res['Matchup'], res['Target_Raw'], res['FD_Price'], res['PIN_Price'], res['Edge_Raw'], gemini_key)
+                    st.session_state[f"briefing_{btn_key}"] = brief
             
-            if f"audit_text_{res['Matchup']}" in st.session_state:
-                st.markdown("### 🕵️ Price Integrity Audit")
-                st.write(st.session_state[f"audit_text_{res['Matchup']}"])
+            if f"briefing_{btn_key}" in st.session_state:
+                st.markdown("### 📋 The Briefing")
+                st.write(st.session_state[f"briefing_{btn_key}"])
 else:
-    st.info(f"No games currently meet the {min_edge} Edge requirement.")
+    st.info(f"No games meet the {min_edge} requirement.")
