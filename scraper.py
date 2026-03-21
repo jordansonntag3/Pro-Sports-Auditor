@@ -1,100 +1,83 @@
-import os
 import requests
 import pandas as pd
-from datetime import datetime, timezone, timedelta
+import os
+from datetime import datetime
 
 # 1. Configuration
-API_KEY = os.environ.get("ODDS_API_KEY")
-FILE_NAME = "opening_lines.csv"
-LEAGUES = {
-    "NBA": "basketball_nba", 
-    "NHL": "icehockey_nhl", 
-    "NCAA B": "basketball_ncaab"
-}
+API_KEY = os.getenv('ODDS_API_KEY')
+DISCORD_URL = os.getenv('DISCORD_WEBHOOK_URL') # Add this to GitHub Secrets!
+REGIONS = 'us'
+MARKETS = 'spreads' 
+LEAGUES = ['basketball_nba', 'basketball_ncaab', 'americanfootball_nfl', 'icehockey_nhl']
 
-def fetch_current_snapshot():
-    all_results = []
-    now_utc = datetime.now(timezone.utc)
-    # Scan for games starting in the next 48 hours
-    future_utc = now_utc + timedelta(hours=48)
-    
-    time_from = now_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
-    time_to = future_utc.strftime('%Y-%m-%dT%H:%M:%SZ')
+# Thresholds for the Sentinel Alert
+SMASH_SPREAD = 1.5  # 1.5 point gap
+SMASH_ML = 25       # 25 cent moneyline gap
 
-    for name, slug in LEAGUES.items():
-        url = f"https://api.the-odds-api.com/v4/sports/{slug}/odds/"
+def send_discord_alert(msg):
+    if DISCORD_URL:
+        requests.post(DISCORD_URL, json={"content": msg})
+
+def get_opening_lines():
+    all_data = []
+    alerts = []
+    recorded_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+
+    for league in LEAGUES:
+        # NHL uses h2h (moneyline), others use spreads
+        mkt_type = 'h2h' if 'nhl' in league else 'spreads'
+        url = f'https://api.the-odds-api.com/v4/sports/{league}/odds/'
         params = {
-            "apiKey": API_KEY, 
-            "regions": "us,eu", 
-            "markets": "spreads", 
-            "bookmakers": "fanduel,pinnacle", 
-            "commenceTimeFrom": time_from, 
-            "commenceTimeTo": time_to
+            'apiKey': API_KEY,
+            'regions': REGIONS,
+            'markets': mkt_type,
+            'bookmakers': 'fanduel,pinnacle',
         }
         
         try:
-            response = requests.get(url, params=params)
-            data = response.json()
-            for game in data:
-                away_team = game.get('away_team')
-                home_team = game.get('home_team')
-                fd_away, pin_away = None, None
-                
-                for book in game.get('bookmakers', []):
-                    markets = book.get('markets', [])
-                    if not markets: continue
-                    outcomes = markets[0].get('outcomes', [])
-                    for o in outcomes:
-                        if o.get('name') == away_team:
-                            if book['key'] == 'fanduel': fd_away = o.get('point')
-                            if book['key'] == 'pinnacle': pin_away = o.get('point')
-                
-                if fd_away is not None and pin_away is not None:
-                    # Matchup-Proofing: Alphabetical sort so names always match
-                    teams = sorted([away_team, home_team])
-                    all_results.append({
-                        "Matchup": f"{teams[0]} vs {teams[1]}",
-                        "Sport": name,
-                        "Open_FanDuel": fd_away,
-                        "Open_Pinnacle": pin_away,
-                        "Start_Time": game.get('commence_time'),
-                        "Recorded_At": now_utc.strftime('%Y-%m-%d %H:%M:%S UTC')
-                    })
+            response = requests.get(url, params=params).json()
+            if isinstance(response, list):
+                for game in response:
+                    # Logic to compare FD and PIN during the scrape
+                    fd_val, pin_val = None, None
+                    away_t, home_t = game['away_team'], game['home_team']
+                    
+                    for b in game.get('bookmakers', []):
+                        outcomes = b.get('markets', [{}])[0].get('outcomes', [])
+                        for o in outcomes:
+                            val = o.get('point') if mkt_type == 'spreads' else o.get('price')
+                            if b['key'] == 'fanduel': fd_val = val
+                            if b['key'] == 'pinnacle': pin_val = val
+                            
+                            # Log for the CSV
+                            if b['key'] == 'fanduel':
+                                all_data.append({
+                                    'Team': o['name'],
+                                    'Opening_Line': val,
+                                    'Recorded_At': recorded_at,
+                                    'Sport': league
+                                })
+                    
+                    # SENTINEL CHECK: If we have both prices, check for a SMASH
+                    if fd_val and pin_val:
+                        edge = abs(fd_val - pin_val)
+                        if mkt_type == 'h2h': edge *= 100 # Convert to cents
+                        
+                        threshold = SMASH_ML if mkt_type == 'h2h' else SMASH_SPREAD
+                        if edge >= threshold:
+                            alerts.append(f"💥 **4AM SMASH ALERT**: {away_t}@{home_t} | Edge: {edge:.1f} | FD: {fd_val} vs PIN: {pin_val}")
+
         except Exception as e:
-            print(f"Error fetching {name}: {e}")
-            
-    return pd.DataFrame(all_results)
+            print(f"Error fetching {league}: {e}")
 
-def main():
-    if not API_KEY:
-        print("Error: ODDS_API_KEY not found in environment.")
-        return
-
-    new_data = fetch_current_snapshot()
-    if new_data.empty: 
-        print("No new data found.")
-        return
-
-    # LEDGER LOGIC: Append new scan to history
-    if os.path.exists(FILE_NAME):
-        try:
-            existing_df = pd.read_csv(FILE_NAME)
-            df = pd.concat([existing_df, new_data])
-        except:
-            df = new_data
-    else:
-        df = new_data
-
-    # THE JANITOR: Remove games that started > 6 hours ago
-    current_utc = datetime.now(timezone.utc)
-    cutoff = current_utc - timedelta(hours=6)
+    # Fire off alerts to Discord
+    if alerts:
+        send_discord_alert("\n".join(alerts))
     
-    df['Start_Time_DT'] = pd.to_datetime(df['Start_Time'])
-    df = df[df['Start_Time_DT'] > cutoff]
-    df = df.drop(columns=['Start_Time_DT'])
-
-    df.to_csv(FILE_NAME, index=False)
-    print(f"Success! Ledger updated. File now contains {len(df)} rows.")
+    return pd.DataFrame(all_data)
 
 if __name__ == "__main__":
-    main()
+    new_df = get_opening_lines()
+    if not new_df.empty:
+        new_df.to_csv('opening_lines.csv', index=False)
+        print("Scrape and Sentinel Audit Complete.")
