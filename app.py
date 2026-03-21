@@ -83,14 +83,19 @@ def send_discord_live(messages):
         payload = {"content": "📢 **LIVE VALUE FOUND ON THE BOARD:**\n" + "\n".join(messages)}
         requests.post(discord_live_url, json=payload)
 
-# --- MASTER INTELLIGENCE ---
+# --- MASTER INTELLIGENCE (Verdict Enforcement Edition) ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
 
-    format_rules = "MAX 2 SENTENCES." if mode == "quick" else "Structured list: Roster, Fatigue, Verdict."
+    # THE VERDICT LAW: Strict instructions for the AI
+    if mode == "quick":
+        format_rules = "MAX 2 SENTENCES. You MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+    else:
+        format_rules = "Structured breakdown: 1. Roster Audit, 2. Fatigue/Schedule, 3. Market Verdict. YOU MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+
     prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {format_rules}"
     
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
@@ -105,7 +110,7 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         if grounding and not cached_news:
             st.session_state.search_ledger[matchup] = str(grounding.get('searchEntryPoint', ''))
         return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
-    except: return "⚠️ API ERROR"
+    except: return "⚠️ API ERROR: Intel engine timed out."
 
 # --- TABS ---
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
