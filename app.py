@@ -14,12 +14,12 @@ with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
     
-    if st.button("🔄 RESET SCANNER & CACHE", use_container_width=True):
+    if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
-        keys_to_keep = ['active_NBA', 'active_NHL', 'active_NCAA B', 'active_NFL', 'active_NCAA F', 'sent_alerts']
+        # Full wipe to clear memory and re-sync with GitHub
         for key in list(st.session_state.keys()):
-            if key not in keys_to_keep:
-                del st.session_state[key]
+            del st.session_state[key]
+        st.success("System Reset. Re-syncing with Master Ledger...")
         st.rerun()
         
     st.divider()
@@ -31,6 +31,7 @@ st.title("💥 BANG! Button")
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
+if "bet_history" not in st.session_state: st.session_state.bet_history = [] # Local record
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -47,41 +48,40 @@ def to_american(decimal):
     if decimal >= 2.0: return f"+{int((decimal - 1) * 100)}"
     else: return f"{int(-100 / (decimal - 1))}"
 
-# --- UTILITY: PERMANENT GITHUB LEDGER (With Debugging) ---
+# --- UTILITY: PERMANENT GITHUB LEDGER ---
 def log_to_github_ledger(new_data):
-    repo = "jordansonntag3/Pro-Sports-Auditor" # Double check this is your repo name!
+    repo = "jordansonntag3/Pro-Sports-Auditor"
     path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     
-    # 1. Get current file
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content_data = r.json()
         sha = content_data['sha']
         current_csv = base64.b64decode(content_data['content']).decode('utf-8')
         df = pd.read_csv(StringIO(current_csv))
-    elif r.status_code == 404:
+    else:
         sha = None
         df = pd.DataFrame(columns=["Date", "Team", "Sport", "Line", "Edge", "Vibe", "Units"])
-    else:
-        st.error(f"GitHub Access Error: {r.status_code}. Check your Token permissions.")
-        return False
 
-    # 2. Append and Encode
     df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     new_csv = df.to_csv(index=False)
     encoded_content = base64.b64encode(new_csv.encode('utf-8')).decode('utf-8')
 
-    # 3. Push back
-    payload = {"message": f"Log Play: {new_data['Team']}", "content": encoded_content, "branch": "main"} # Change 'main' to 'master' if needed
+    payload = {"message": f"Log Play: {new_data['Team']}", "content": encoded_content, "branch": "main"}
     if sha: payload["sha"] = sha
     
     put_r = requests.put(url, headers=headers, json=payload)
-    if put_r.status_code in [200, 201]: return True
-    else:
-        st.error(f"GitHub Write Error: {put_r.status_code}. Details: {put_r.text}")
-        return False
+    return put_r.status_code in [200, 201]
+
+# --- LOAD MASTER LEDGER ON STARTUP ---
+if not st.session_state.bet_history:
+    LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
+    try:
+        master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
+        st.session_state.bet_history = master_df.to_dict('records')
+    except: pass
 
 def send_discord_live(messages):
     if discord_live_url and messages:
@@ -196,9 +196,7 @@ with tab1:
                             new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
         st.session_state.scan_results = new_res
-        if discord_messages: 
-            send_discord_live(discord_messages)
-            st.toast(f"Pushed {len(discord_messages)} alerts to Discord!")
+        if discord_messages: send_discord_live(discord_messages)
 
     if st.session_state.scan_results:
         for res in st.session_state.scan_results:
@@ -227,24 +225,26 @@ with tab1:
                             "Date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "Team": res['Target'],
                             "Sport": res['Sport'],
-                            "Line": display_price, # Saves as +110 or -107
+                            "Line": display_price,
                             "Edge": f"{res['Edge']:.1f}",
                             "Vibe": v,
                             "Units": units
                         }
                         if log_to_github_ledger(bet_data):
-                            st.toast("✅ Saved!")
-                            time.sleep(1.5) # Time for GitHub to reflect
+                            # INSTANT UPDATE: Add to local session before refresh
+                            st.session_state.bet_history.append(bet_data)
+                            st.toast("✅ Saved Permanently!")
+                            time.sleep(0.5)
                             st.rerun()
 
                 if q_k in st.session_state: st.info(st.session_state[q_k])
                 if d_k in st.session_state: st.success(st.session_state[d_k])
 
 with tab2:
-    st.header("📈 Permanent Performance History")
-    LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
-    try:
-        master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
+    st.header("📈 Performance Ledger")
+    # Show the local record combined with the startup record
+    if st.session_state.bet_history:
+        master_df = pd.DataFrame(st.session_state.bet_history)
         st.dataframe(master_df.iloc[::-1], use_container_width=True)
-    except:
-        st.info("No permanent records found yet. Log a play to create the file.")
+    else:
+        st.info("No plays logged. Log a play to build your history!")
