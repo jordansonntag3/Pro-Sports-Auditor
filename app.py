@@ -30,7 +30,6 @@ if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
-if "verdict_counts" not in st.session_state: st.session_state.verdict_counts = {"PLAY": 0, "WAIT": 0, "PASS": 0}
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -91,14 +90,18 @@ def delete_last_from_github_ledger():
             return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
     return False
 
-# --- SYNC LEDGER ON STARTUP ---
-if not st.session_state.bet_history:
+# --- SYNC LEDGER FUNCTION ---
+def sync_ledger():
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
         master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
         if "Result" not in master_df.columns: master_df["Result"] = "Pending"
         st.session_state.bet_history = master_df.to_dict('records')
-    except: pass
+        return True
+    except: return False
+
+if not st.session_state.bet_history:
+    sync_ledger()
 
 def send_discord_live(messages):
     if discord_live_url and messages:
@@ -120,9 +123,6 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     try:
         response = requests.post(url, json=payload, timeout=30).json()
         text = response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.')
-        if "PLAY" in text or "SMASH" in text: st.session_state.verdict_counts["PLAY"] += 1
-        elif "WAIT" in text: st.session_state.verdict_counts["WAIT"] += 1
-        elif "PASS" in text: st.session_state.verdict_counts["PASS"] += 1
         return text.strip()
     except: return "⚠️ API ERROR"
 
@@ -130,27 +130,22 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
 
 with tab1:
-    # --- STATUS SUMMARY ---
-    s1, s2, s3 = st.columns(3)
-    s1.metric("🟢 PLAYS", st.session_state.verdict_counts["PLAY"])
-    s2.metric("🟡 WAITS", st.session_state.verdict_counts["WAIT"])
-    s3.metric("🛑 PASSES", st.session_state.verdict_counts["PASS"])
-
-    with st.expander("🛠️ Settings", expanded=False):
-        col1, col2 = st.columns([1, 1.2])
-        with col1:
-            horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-            min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.0, 0.5, 0.5)
-            min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 20, 10, 5)
-        with col2:
-            st.write("**Leagues:**")
-            c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
-            l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
-            for i, league in enumerate(leagues_list):
-                active = st.session_state[f"active_{league}"]
-                if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t_{league}", use_container_width=True):
-                    st.session_state[f"active_{league}"] = not active; st.rerun()
-                if st.session_state[f"active_{league}"]: selected_leagues.append(league)
+    # 2. Rename and Remove Dropdown
+    st.markdown("### 🛠️ Scan Settings")
+    col1, col2 = st.columns([1, 1.2])
+    with col1:
+        horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
+        min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.0, 0.5, 0.5)
+        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 20, 10, 5)
+    with col2:
+        st.write("**Leagues:**")
+        c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
+        l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
+        for i, league in enumerate(leagues_list):
+            active = st.session_state[f"active_{league}"]
+            if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t_{league}", use_container_width=True):
+                st.session_state[f"active_{league}"] = not active; st.rerun()
+            if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []; discord_messages = []; now_utc = datetime.utcnow(); today_str = datetime.now().strftime("%Y-%m-%d")
@@ -224,12 +219,19 @@ with tab1:
 with tab2:
     st.header("📈 Performance Ledger")
     
+    # Add a Refresh button to "Scan" for new entries or updates from GitHub
+    if st.button("🔄 REFRESH LEDGER FROM GITHUB", use_container_width=True):
+        if sync_ledger(): st.toast("Synced with GitHub!")
+        else: st.error("Sync failed.")
+        st.rerun()
+    
     if st.session_state.bet_history:
-        # Convert to DF for editing
         df = pd.DataFrame(st.session_state.bet_history)
         
         # Grading Suite
-        with st.expander("📝 GRADE PLAYS (Edit Results Below)", expanded=True):
+        with st.container(border=True):
+            st.write("### 📝 Grading Room")
+            st.caption("Pick a result in the table below and hit Save.")
             edited_df = st.data_editor(
                 df.iloc[::-1], 
                 column_config={
@@ -246,7 +248,7 @@ with tab2:
                 if log_to_github_ledger({}, overwrite_df=final_to_save):
                     st.success("Ledger Updated Successfully!"); time.sleep(1); st.rerun()
 
-        # Clean Display View (1-based index)
+        # Clean Display View
         st.subheader("Archive View")
         display_df = df.iloc[::-1].copy()
         display_df.index = range(1, len(display_df) + 1)
