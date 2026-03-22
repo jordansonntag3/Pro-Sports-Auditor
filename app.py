@@ -60,10 +60,8 @@ def log_to_github_ledger(new_data):
     
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
-        content_data = r.json()
-        sha = content_data['sha']
-        current_csv = base64.b64decode(content_data['content']).decode('utf-8')
-        df = pd.read_csv(StringIO(current_csv))
+        content_data = r.json(); sha = content_data['sha']
+        df = pd.read_csv(StringIO(base64.b64decode(content_data['content']).decode('utf-8')))
     else:
         sha = None
         df = pd.DataFrame(columns=["Date", "Team", "Sport", "Line", "Edge", "Vibe", "Units"])
@@ -110,24 +108,12 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
     
-    # THE CIRCUIT BREAKER LAW
-    verdict_rules = f"""
-    VERDICT RULES:
-    1. If a key player on the TARGET TEAM ({target_team}) is 'Questionable', you MUST use **🟡 WAIT**.
-    2. If a key player on the OPPOSING TEAM is 'Questionable', do NOT use WAIT. Use standard verdicts.
-    3. Standard Verdicts: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**.
-    """
-
-    if mode == "quick":
-        rules = f"MAX 2 SENTENCES. {verdict_rules} End with bold verdict."
-    else:
-        rules = f"Structure: Roster Audit, Fatigue Spot, Market Verdict. {verdict_rules} End with bold verdict."
-
-    prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {rules}"
+    verdict_rules = f"1. Key player on TARGET ({target_team}) is 'Q' -> **🟡 WAIT**. 2. Key player on OPPOSING is 'Q' -> NO WAIT. 3. Standard: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, **⚡ SMASH**."
+    prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {verdict_rules}. End with bold verdict."
+    
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search: 
-        payload["tools"] = [{"google_search": {}}]
-        time.sleep(1.5)
+        payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
         response = requests.post(url, json=payload, timeout=30).json()
         candidate = response.get('candidates', [{}])[0]
@@ -140,142 +126,100 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
 
 with tab1:
-    with st.expander("🛠️ Audit & Display Settings", expanded=True):
-        col_set1, col_set2 = st.columns([1, 1.2])
-        with col_set1:
+    with st.expander("🛠️ Settings", expanded=True):
+        col1, col2 = st.columns([1, 1.2])
+        with col1:
             horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
             min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.0, 0.5, 0.5)
             min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 20, 10, 5)
-        with col_set2:
-            st.write("**League Toggles:**")
-            c1, c2, c3 = st.columns(3)
-            btn_cols = [c1, c2, c3, c1, c2]
-            selected_leagues = []
+        with col2:
+            st.write("**Leagues:**")
+            c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
             l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
             for i, league in enumerate(leagues_list):
                 active = st.session_state[f"active_{league}"]
                 if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t_{league}", use_container_width=True):
-                    st.session_state[f"active_{league}"] = not active
-                    st.rerun()
+                    st.session_state[f"active_{league}"] = not active; st.rerun()
                 if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
-        new_res = []
-        discord_messages = []
-        now_utc = datetime.utcnow()
-        RAW_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/opening_lines.csv"
-        try: op_df = pd.read_csv(f"{RAW_URL}?v={time.time()}")
-        except: op_df = pd.DataFrame()
-
+        new_res = []; discord_messages = []; now_utc = datetime.utcnow(); today_str = datetime.now().strftime("%Y-%m-%d")
+        logged_today = [str(b['Team']) for b in st.session_state.bet_history if today_str in str(b['Date'])]
+        
         for name in selected_leagues:
             s_key, mkt = l_map[name]
             url = f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/"
-            params = {"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}
             try:
-                data = requests.get(url, params=params).json()
-                if isinstance(data, list):
-                    for game in data:
-                        # --- PUCK DROP FILTER ---
-                        commence_time = pd.to_datetime(game['commence_time']).replace(tzinfo=None)
-                        if commence_time < now_utc: continue
+                data = requests.get(url, params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
+                for game in data:
+                    # Filter already started games
+                    if pd.to_datetime(game['commence_time']).replace(tzinfo=None) < now_utc: continue
+                    
+                    away_t, home_t = game['away_team'], game['home_team']
+                    fd_a, pin_a, fd_h, pin_h = None, None, None, None
+                    for b in game.get('bookmakers', []):
+                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
+                        for o in mkts:
+                            v = o.get('point') if mkt == 'spreads' else o.get('price')
+                            if o['name'] == away_t:
+                                if b['key'] == 'fanduel': fd_a = v
+                                elif b['key'] == 'pinnacle': pin_a = v
+                            elif o['name'] == home_t:
+                                if b['key'] == 'fanduel': fd_h = v
+                                elif b['key'] == 'pinnacle': pin_h = v
+
+                    if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
+                        if mkt == 'h2h':
+                            edge_a, edge_h = (fd_a - pin_a) * 100, (fd_h - pin_h) * 100
+                            floor = min_ml_edge - 0.01
+                        else:
+                            edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h); floor = min_pt_edge - 0.01
+
+                        if edge_a > edge_h and edge_a >= floor: t_team, edge, fd_p, pin_p = away_t, edge_a, fd_a, pin_a
+                        elif edge_h >= floor: t_team, edge, fd_p, pin_p = home_t, edge_h, fd_h, pin_h
+                        else: continue
                         
-                        away_t, home_t = game.get('away_team'), game.get('home_team')
-                        fd_a, pin_a, fd_h, pin_h = None, None, None, None
-                        for b in game.get('bookmakers', []):
-                            mkts = b.get('markets', [{}])[0].get('outcomes', [])
-                            for o in mkts:
-                                v = o.get('point') if mkt == 'spreads' else o.get('price')
-                                if o['name'] == away_t:
-                                    if b['key'] == 'fanduel': fd_a = v
-                                    elif b['key'] == 'pinnacle': pin_a = v
-                                elif o['name'] == home_h: # Fixed your previous typo
-                                    if b['key'] == 'fanduel': fd_h = v
-                                    elif b['key'] == 'pinnacle': pin_h = v
-                                # Re-fixing common home team typo for safety
-                                elif o['name'] == home_t:
-                                    if b['key'] == 'fanduel': fd_h = v
-                                    elif b['key'] == 'pinnacle': pin_h = v
+                        # ANTI-SPAM: Skip if already alerted this session or already in the Ledger for today
+                        alert_fingerprint = f"{t_team}_{today_str}"
+                        is_duplicate = (alert_fingerprint in st.session_state.sent_alerts) or (t_team in logged_today)
+                        
+                        if edge >= (20 if mkt=='h2h' else 1.0) and not is_duplicate:
+                            line_str = to_american(fd_p) if mkt == 'h2h' else f"{'+' if fd_p > 0 else ''}{fd_p}"
+                            discord_messages.append(f"- **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
+                            st.session_state.sent_alerts.add(alert_fingerprint)
 
-                        if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
-                            if mkt == 'h2h':
-                                edge_a, edge_h = (fd_a - pin_a) * 100, (fd_h - pin_h) * 100
-                                floor = min_ml_edge - 0.01
-                            else:
-                                edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
-                                floor = min_pt_edge - 0.01
-
-                            if edge_a > edge_h and edge_a >= floor:
-                                t_team, edge, fd_p, pin_p = away_t, edge_a, fd_a, pin_a
-                            elif edge_h >= floor:
-                                t_team, edge, fd_p, pin_p = home_t, edge_h, fd_h, pin_h
-                            else: continue
-                            
-                            vibe = "🌊"
-                            if not op_df.empty:
-                                try:
-                                    opening_row = op_df[op_df['Team'] == t_team].iloc[-1]
-                                    mov = abs(fd_p - opening_row['Opening_Line'])
-                                    if mov >= 1.0: vibe = "🚀"
-                                    elif mov <= 0.5: vibe = "⚓"
-                                except: pass
-
-                            # --- WEIGHTED SORTING (Priority Score) ---
-                            priority = edge if mkt == 'h2h' else edge * 15
-                            
-                            alert_threshold = 20 if mkt == 'h2h' else 1.0
-                            alert_fingerprint = f"{t_team}_{fd_p}_{name}"
-                            if edge >= alert_threshold and alert_fingerprint not in st.session_state.sent_alerts:
-                                line_str = to_american(fd_p) if mkt == 'h2h' else f"{'+' if fd_p > 0 else ''}{fd_p}"
-                                discord_messages.append(f"- {vibe} **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
-                                st.session_state.sent_alerts.add(alert_fingerprint)
-
-                            new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Priority": priority, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
+                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Priority": (edge if mkt == 'h2h' else edge * 15), "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
-        
-        # Sort by Weighted Priority
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Priority'], reverse=True)
         if discord_messages: send_discord_live(discord_messages)
 
     if st.session_state.scan_results:
         for res in st.session_state.scan_results:
             with st.container(border=True):
-                v = res.get('Vibe', '🌊')
                 display_price = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
-                st.subheader(f"{v} {res['Target']} ({display_price})")
+                st.subheader(f"{res['Target']} ({display_price})")
                 st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
-                
                 c1, c2 = st.columns(2)
-                c1.metric("Market Edge", f"{res.get('Edge', 0):.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
+                c1.metric("Market Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
                 if res['Market'] == 'h2h': c2.metric("Pinnacle Price", to_american(res['PIN']))
-                
-                ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
-                q_k, d_k = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
+                ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5]); q_k, d_k = f"q_{res['Matchup']}", f"d_{res['Matchup']}"
                 if ca.button(f"⚡ Quick Intel", key=f"btn_{q_k}", use_container_width=True):
-                    st.session_state[q_k] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res.get('Edge', 0), gemini_key, mode="quick")
+                    st.session_state[q_k] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="quick")
                 if cb.button(f"🔎 Detailed Intel", key=f"btn_{d_k}", use_container_width=True):
-                    st.session_state[d_k] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res.get('Edge', 0), gemini_key, mode="detailed")
-                
-                units = cc.number_input("Units", min_value=0.1, max_value=10.0, value=1.0, step=0.5, key=f"u_{res['Matchup']}")
-                
+                    st.session_state[d_k] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="detailed")
+                units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"u_{res['Matchup']}")
                 if cd.button(f"✅ LOG PLAY", key=f"log_{res['Matchup']}", use_container_width=True, type="primary"):
                     with st.spinner("Saving..."):
-                        bet_data = {"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Vibe": v, "Units": units}
+                        bet_data = {"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Units": units}
                         if log_to_github_ledger(bet_data):
-                            st.session_state.bet_history.append(bet_data)
-                            st.toast("✅ Saved Permanently!"); time.sleep(0.5); st.rerun()
-
+                            st.session_state.bet_history.append(bet_data); st.toast("✅ Saved!"); time.sleep(0.5); st.rerun()
                 if q_k in st.session_state: st.info(st.session_state[q_k])
                 if d_k in st.session_state: st.success(st.session_state[d_k])
 
 with tab2:
     st.header("📈 Performance Ledger")
-    col_a, col_b = st.columns([1, 4])
-    if col_a.button("🗑️ DELETE LAST", use_container_width=True):
+    if st.button("🗑️ DELETE LAST", use_container_width=True):
         if delete_last_from_github_ledger():
-            st.toast("Deleted Last Entry."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
-            
+            st.toast("Deleted."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
     if st.session_state.bet_history:
-        master_df = pd.DataFrame(st.session_state.bet_history)
-        st.dataframe(master_df.iloc[::-1], use_container_width=True)
-    else:
-        st.info("No plays logged yet.")
+        st.dataframe(pd.DataFrame(st.session_state.bet_history).iloc[::-1], use_container_width=True)
