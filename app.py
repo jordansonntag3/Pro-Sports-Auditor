@@ -222,4 +222,5 @@ with tab2:
         if delete_last_from_github_ledger():
             st.toast("Deleted."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
     if st.session_state.bet_history:
-        st.dataframe(pd.DataFrame(st.session_state.bet_history).iloc[::-1], use_container_width=True)
+        display_df = pd.DataFrame(st.session_state.bet_history).iloc[::-1].reset_index(drop=True)
+        st.dataframe(display_df, use_container_width=True)
