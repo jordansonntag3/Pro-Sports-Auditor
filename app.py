@@ -18,8 +18,6 @@ with st.sidebar:
         st.cache_data.clear()
         for key in list(st.session_state.keys()):
             del st.session_state[key]
-        st.success("System Cleared. Re-syncing...")
-        time.sleep(1)
         st.rerun()
         
     st.divider()
@@ -32,6 +30,7 @@ if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
+if "verdict_counts" not in st.session_state: st.session_state.verdict_counts = {"PLAY": 0, "WAIT": 0, "PASS": 0}
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -52,7 +51,7 @@ def to_american(decimal):
     except: return str(decimal)
 
 # --- UTILITY: PERMANENT GITHUB LEDGER ---
-def log_to_github_ledger(new_data):
+def log_to_github_ledger(new_data, overwrite_df=None):
     repo = "jordansonntag3/Pro-Sports-Auditor"
     path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -61,21 +60,23 @@ def log_to_github_ledger(new_data):
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content_data = r.json(); sha = content_data['sha']
-        df = pd.read_csv(StringIO(base64.b64decode(content_data['content']).decode('utf-8')))
+        if overwrite_df is not None: df = overwrite_df
+        else:
+            df = pd.read_csv(StringIO(base64.b64decode(content_data['content']).decode('utf-8')))
+            df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     else:
         sha = None
-        df = pd.DataFrame(columns=["Date", "Team", "Sport", "Line", "Edge", "Vibe", "Units"])
+        df = pd.DataFrame([new_data])
 
-    df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
     new_csv = df.to_csv(index=False)
     encoded_content = base64.b64encode(new_csv.encode('utf-8')).decode('utf-8')
-    payload = {"message": f"Log Play: {new_data['Team']}", "content": encoded_content, "branch": "main"}
+    msg = "Update Results" if overwrite_df is not None else f"Log Play: {new_data.get('Team', 'Update')}"
+    payload = {"message": msg, "content": encoded_content, "branch": "main"}
     if sha: payload["sha"] = sha
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
 
 def delete_last_from_github_ledger():
-    repo = "jordansonntag3/Pro-Sports-Auditor"
-    path = "bet_ledger.csv"
+    repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
     r = requests.get(url, headers=headers)
@@ -94,6 +95,7 @@ if not st.session_state.bet_history:
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
         master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
+        if "Result" not in master_df.columns: master_df["Result"] = "Pending"
         st.session_state.bet_history = master_df.to_dict('records')
     except: pass
 
@@ -101,7 +103,7 @@ def send_discord_live(messages):
     if discord_live_url and messages:
         requests.post(discord_live_url, json={"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(messages)})
 
-# --- MASTER INTELLIGENCE (Wait Category Logic) ---
+# --- MASTER INTELLIGENCE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
@@ -116,17 +118,24 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
         response = requests.post(url, json=payload, timeout=30).json()
-        candidate = response.get('candidates', [{}])[0]
-        if 'groundingMetadata' in candidate and not cached_news:
-            st.session_state.search_ledger[matchup] = str(candidate['groundingMetadata'].get('searchEntryPoint', ''))
-        return candidate.get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
+        text = response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.')
+        if "PLAY" in text or "SMASH" in text: st.session_state.verdict_counts["PLAY"] += 1
+        elif "WAIT" in text: st.session_state.verdict_counts["WAIT"] += 1
+        elif "PASS" in text: st.session_state.verdict_counts["PASS"] += 1
+        return text.strip()
     except: return "⚠️ API ERROR"
 
 # --- TABS ---
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
 
 with tab1:
-    with st.expander("🛠️ Settings", expanded=True):
+    # --- STATUS SUMMARY ---
+    s1, s2, s3 = st.columns(3)
+    s1.metric("🟢 PLAYS", st.session_state.verdict_counts["PLAY"])
+    s2.metric("🟡 WAITS", st.session_state.verdict_counts["WAIT"])
+    s3.metric("🛑 PASSES", st.session_state.verdict_counts["PASS"])
+
+    with st.expander("🛠️ Settings", expanded=False):
         col1, col2 = st.columns([1, 1.2])
         with col1:
             horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
@@ -152,9 +161,7 @@ with tab1:
             try:
                 data = requests.get(url, params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
                 for game in data:
-                    # Filter already started games
                     if pd.to_datetime(game['commence_time']).replace(tzinfo=None) < now_utc: continue
-                    
                     away_t, home_t = game['away_team'], game['home_team']
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
@@ -167,7 +174,6 @@ with tab1:
                             elif o['name'] == home_t:
                                 if b['key'] == 'fanduel': fd_h = v
                                 elif b['key'] == 'pinnacle': pin_h = v
-
                     if all(v is not None for v in [fd_a, pin_a, fd_h, pin_h]):
                         if mkt == 'h2h':
                             edge_a, edge_h = (fd_a - pin_a) * 100, (fd_h - pin_h) * 100
@@ -179,10 +185,8 @@ with tab1:
                         elif edge_h >= floor: t_team, edge, fd_p, pin_p = home_t, edge_h, fd_h, pin_h
                         else: continue
                         
-                        # ANTI-SPAM: Skip if already alerted this session or already in the Ledger for today
                         alert_fingerprint = f"{t_team}_{today_str}"
                         is_duplicate = (alert_fingerprint in st.session_state.sent_alerts) or (t_team in logged_today)
-                        
                         if edge >= (20 if mkt=='h2h' else 1.0) and not is_duplicate:
                             line_str = to_american(fd_p) if mkt == 'h2h' else f"{'+' if fd_p > 0 else ''}{fd_p}"
                             discord_messages.append(f"- **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
@@ -210,7 +214,7 @@ with tab1:
                 units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"u_{res['Matchup']}")
                 if cd.button(f"✅ LOG PLAY", key=f"log_{res['Matchup']}", use_container_width=True, type="primary"):
                     with st.spinner("Saving..."):
-                        bet_data = {"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Units": units}
+                        bet_data = {"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Units": units, "Result": "Pending"}
                         if log_to_github_ledger(bet_data):
                             st.session_state.bet_history.append(bet_data); st.toast("✅ Saved!"); time.sleep(0.5); st.rerun()
                 if q_k in st.session_state: st.info(st.session_state[q_k])
@@ -218,9 +222,29 @@ with tab1:
 
 with tab2:
     st.header("📈 Performance Ledger")
-    if st.button("🗑️ DELETE LAST", use_container_width=True):
-        if delete_last_from_github_ledger():
-            st.toast("Deleted."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
+    
     if st.session_state.bet_history:
-        display_df = pd.DataFrame(st.session_state.bet_history).iloc[::-1].reset_index(drop=True)
+        # Convert to DF for editing
+        df = pd.DataFrame(st.session_state.bet_history)
+        
+        # Grading Suite
+        with st.expander("📝 GRADE PLAYS (Edit Results Below)", expanded=True):
+            edited_df = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.Selectbox(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
+            
+            if st.button("💾 SAVE ALL GRADES TO GITHUB", use_container_width=True, type="primary"):
+                # Flip it back to original order for saving
+                final_to_save = edited_df.iloc[::-1]
+                if log_to_github_ledger({}, overwrite_df=final_to_save):
+                    st.success("Ledger Updated Successfully!"); time.sleep(1); st.rerun()
+
+        # Clean Display View (1-based index)
+        st.subheader("Archive View")
+        display_df = df.iloc[::-1].copy()
+        display_df.index = range(1, len(display_df) + 1)
         st.dataframe(display_df, use_container_width=True)
+
+        if st.button("🗑️ DELETE LAST LOGGED PLAY", use_container_width=True):
+            if delete_last_from_github_ledger():
+                st.toast("Deleted."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
+    else:
+        st.info("No plays logged yet.")
