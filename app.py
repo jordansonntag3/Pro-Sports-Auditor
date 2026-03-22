@@ -60,7 +60,8 @@ def log_to_github_ledger(new_data, overwrite_df=None):
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content_data = r.json(); sha = content_data['sha']
-        if overwrite_df is not None: df = overwrite_df
+        if overwrite_df is not None: 
+            df = overwrite_df
         else:
             df = pd.read_csv(StringIO(base64.b64decode(content_data['content']).decode('utf-8')))
             df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
@@ -229,10 +230,18 @@ with tab2:
         
         # Grading Suite
         with st.expander("📝 GRADE PLAYS (Edit Results Below)", expanded=True):
-            edited_df = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.Selectbox(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
+            edited_df = st.data_editor(
+                df.iloc[::-1], 
+                column_config={
+                    "Result": st.column_config.SelectboxColumn(
+                        options=["Pending", "Win", "Loss", "Push"]
+                    )
+                }, 
+                use_container_width=True, 
+                hide_index=False
+            )
             
             if st.button("💾 SAVE ALL GRADES TO GITHUB", use_container_width=True, type="primary"):
-                # Flip it back to original order for saving
                 final_to_save = edited_df.iloc[::-1]
                 if log_to_github_ledger({}, overwrite_df=final_to_save):
                     st.success("Ledger Updated Successfully!"); time.sleep(1); st.rerun()
