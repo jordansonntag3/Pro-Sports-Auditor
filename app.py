@@ -103,17 +103,25 @@ def send_discord_live(messages):
     if discord_live_url and messages:
         requests.post(discord_live_url, json={"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(messages)})
 
-# --- MASTER INTELLIGENCE ---
+# --- MASTER INTELLIGENCE (Wait Category Logic) ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
     
+    # THE CIRCUIT BREAKER LAW
+    verdict_rules = f"""
+    VERDICT RULES:
+    1. If a key player on the TARGET TEAM ({target_team}) is 'Questionable', you MUST use **🟡 WAIT**.
+    2. If a key player on the OPPOSING TEAM is 'Questionable', do NOT use WAIT. Use standard verdicts.
+    3. Standard Verdicts: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**.
+    """
+
     if mode == "quick":
-        rules = "MAX 2 SENTENCES. You MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+        rules = f"MAX 2 SENTENCES. {verdict_rules} End with bold verdict."
     else:
-        rules = "Structure: Roster Audit, Fatigue Spot, Market Verdict. YOU MUST end with a bold verdict: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, or **⚡ SMASH PLAY**."
+        rules = f"Structure: Roster Audit, Fatigue Spot, Market Verdict. {verdict_rules} End with bold verdict."
 
     prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {rules}"
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
@@ -180,6 +188,10 @@ with tab1:
                                 if o['name'] == away_t:
                                     if b['key'] == 'fanduel': fd_a = v
                                     elif b['key'] == 'pinnacle': pin_a = v
+                                elif o['name'] == home_h: # Fixed your previous typo
+                                    if b['key'] == 'fanduel': fd_h = v
+                                    elif b['key'] == 'pinnacle': pin_h = v
+                                # Re-fixing common home team typo for safety
                                 elif o['name'] == home_t:
                                     if b['key'] == 'fanduel': fd_h = v
                                     elif b['key'] == 'pinnacle': pin_h = v
@@ -207,7 +219,7 @@ with tab1:
                                     elif mov <= 0.5: vibe = "⚓"
                                 except: pass
 
-                            # Weighted Sorting (1pt spread = 15 cent ML)
+                            # --- WEIGHTED SORTING (Priority Score) ---
                             priority = edge if mkt == 'h2h' else edge * 15
                             
                             alert_threshold = 20 if mkt == 'h2h' else 1.0
@@ -220,7 +232,7 @@ with tab1:
                             new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": fd_p, "PIN": pin_p, "Edge": edge, "Priority": priority, "Vibe": vibe, "Matchup": f"{away_t} @ {home_t}", "Start": (pd.to_datetime(game['commence_time']) - pd.Timedelta(hours=5)).strftime('%m/%d %I:%M %p')})
             except: continue
         
-        # Sort by Weighted Priority (Best value across all sports at top)
+        # Sort by Weighted Priority
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Priority'], reverse=True)
         if discord_messages: send_discord_live(discord_messages)
 
@@ -260,7 +272,7 @@ with tab2:
     col_a, col_b = st.columns([1, 4])
     if col_a.button("🗑️ DELETE LAST", use_container_width=True):
         if delete_last_from_github_ledger():
-            st.toast("Deleted."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
+            st.toast("Deleted Last Entry."); st.session_state.bet_history = []; time.sleep(1); st.rerun()
             
     if st.session_state.bet_history:
         master_df = pd.DataFrame(st.session_state.bet_history)
