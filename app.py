@@ -30,6 +30,7 @@ if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
+if "last_sync" not in st.session_state: st.session_state.last_sync = 0
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -76,15 +77,12 @@ def log_to_github_ledger(new_data, overwrite_df=None):
 
 # --- UTILITY: AUTOMATED GRADING ENGINE ---
 def auto_grade_ledger():
-    if not st.session_state.bet_history: return False
-    
+    if not st.session_state.bet_history: return "No history found."
     df = pd.DataFrame(st.session_state.bet_history)
     pending_mask = df['Result'] == 'Pending'
-    if not pending_mask.any(): return "No pending plays."
+    if not pending_mask.any(): return "No pending plays found."
 
     l_map = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
-    
-    # Check each sport involved in pending bets
     unique_sports = df.loc[pending_mask, 'Sport'].unique()
     scores_db = {}
 
@@ -100,29 +98,19 @@ def auto_grade_ledger():
                         scores_db[match['away_team']] = match['scores']
             except: continue
 
-    # Process pending rows
     updated = False
     for idx, row in df.loc[pending_mask].iterrows():
         team = row['Team']
         if team in scores_db:
             scores = scores_db[team]
-            # Find which score is ours
             my_s = next(int(s['score']) for s in scores if s['name'] == team)
             opp_s = next(int(s['score']) for s in scores if s['name'] != team)
-            
             line = row['Line']
             try:
-                # Handle Spreads
                 if any(x in str(line) for x in ['+', '-']) and '.' in str(line):
                     net = my_s + float(line)
-                    if net > opp_s: res = "Win"
-                    elif net < opp_s: res = "Loss"
-                    else: res = "Push"
-                # Handle Moneyline
-                else:
-                    if my_s > opp_s: res = "Win"
-                    else: res = "Loss"
-                
+                    res = "Win" if net > opp_s else ("Loss" if net < opp_s else "Push")
+                else: res = "Win" if my_s > opp_s else "Loss"
                 df.at[idx, 'Result'] = res
                 updated = True
             except: continue
@@ -130,8 +118,23 @@ def auto_grade_ledger():
     if updated:
         log_to_github_ledger({}, overwrite_df=df)
         st.session_state.bet_history = df.to_dict('records')
-        return "Grades applied!"
-    return "Scores not available yet."
+        return "Grades applied successfully!"
+    return "Scores for these games aren't finalized yet."
+
+# --- SYNC LEDGER (Auto-Triggered) ---
+def sync_ledger():
+    LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
+    try:
+        master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
+        if "Result" not in master_df.columns: master_df["Result"] = "Pending"
+        st.session_state.bet_history = master_df.to_dict('records')
+        st.session_state.last_sync = time.time()
+        return True
+    except: return False
+
+# AUTO-SYNC PULSE: Runs every 60 seconds automatically
+if time.time() - st.session_state.last_sync > 60:
+    sync_ledger()
 
 def delete_last_from_github_ledger():
     repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
@@ -148,19 +151,6 @@ def delete_last_from_github_ledger():
             return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
     return False
 
-# --- SYNC LEDGER ON STARTUP ---
-def sync_ledger():
-    LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
-    try:
-        master_df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
-        if "Result" not in master_df.columns: master_df["Result"] = "Pending"
-        st.session_state.bet_history = master_df.to_dict('records')
-        return True
-    except: return False
-
-if not st.session_state.bet_history:
-    sync_ledger()
-
 def send_discord_live(messages):
     if discord_live_url and messages:
         requests.post(discord_live_url, json={"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(messages)})
@@ -171,10 +161,8 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
-    
     verdict_rules = f"1. Key player on TARGET ({target_team}) is 'Q' -> **🟡 WAIT**. 2. Key player on OPPOSING is 'Q' -> NO WAIT. 3. Standard: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, **⚡ SMASH**."
     prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {verdict_rules}. End with bold verdict."
-    
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search: 
         payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
@@ -275,22 +263,15 @@ with tab1:
 with tab2:
     st.header("📈 Performance Ledger")
     
-    col_a, col_b = st.columns(2)
-    if col_a.button("🔄 REFRESH LEDGER FROM GITHUB", use_container_width=True):
-        if sync_ledger(): st.toast("Synced!")
-        st.rerun()
-    
-    if col_b.button("🤖 AUTO-GRADE PENDING PLAYS", use_container_width=True, type="primary"):
-        with st.spinner("Auditing scores via API..."):
+    # --- AUTO-GRADE BUTTON ---
+    if st.button("🤖 AUTO-GRADE PENDING PLAYS", use_container_width=True, type="primary"):
+        with st.spinner("Scanning for final scores..."):
             status = auto_grade_ledger()
-            st.toast(status)
-            time.sleep(1)
-            st.rerun()
+            st.toast(status); time.sleep(1); st.rerun()
     
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
         
-        # Grading Suite
         with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
             edited_df = st.data_editor(
                 df.iloc[::-1], 
