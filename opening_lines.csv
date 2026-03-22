@@ -1,51 +1,59 @@
-Matchup,Sport,Open_FanDuel,Open_Pinnacle,Start_Time,Recorded_At
-Test Connection,TEST,0.0,0.0,2099-01-01T00:00:00Z,NOW
-Arkansas Razorbacks vs High Point Panthers,NCAA B,11.5,11.0,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
-Duke Blue Devils vs TCU Horned Frogs,NCAA B,10.5,11.0,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
-Louisville Cardinals vs Michigan St Spartans,NCAA B,4.5,4.0,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
-Nebraska Cornhuskers vs Vanderbilt Commodores,NCAA B,-2.5,-2.5,2026-03-21T16:00:00Z,2026-03-20 00:25:09 UTC
-Louisville Cardinals vs Michigan St Spartans,NCAA B,3.5,4.0,2026-03-21T18:45:00Z,2026-03-20 09:05:21 UTC
-Duke Blue Devils vs TCU Horned Frogs,NCAA B,10.5,11.0,2026-03-21T21:15:00Z,2026-03-20 09:05:21 UTC
-Nebraska Cornhuskers vs Vanderbilt Commodores,NCAA B,-2.5,-3.0,2026-03-22T00:45:00Z,2026-03-20 09:05:21 UTC
-Arkansas Razorbacks vs High Point Panthers,NCAA B,11.5,11.0,2026-03-22T01:45:00Z,2026-03-20 09:05:21 UTC
-Oklahoma City Thunder vs Washington Wizards,NBA,-21.5,-21.0,2026-03-21T21:10:00Z,2026-03-21 19:07:55 UTC
-Charlotte Hornets vs Memphis Grizzlies,NBA,18.5,17.5,2026-03-21T23:10:00Z,2026-03-21 19:07:55 UTC
-Cleveland Cavaliers vs New Orleans Pelicans,NBA,-4.5,-4.5,2026-03-21T23:10:00Z,2026-03-21 19:07:55 UTC
-Los Angeles Lakers vs Orlando Magic,NBA,-3.0,-3.0,2026-03-21T23:11:00Z,2026-03-21 19:07:55 UTC
-Atlanta Hawks vs Golden State Warriors,NBA,11.0,10.5,2026-03-22T00:10:00Z,2026-03-21 19:07:55 UTC
-Indiana Pacers vs San Antonio Spurs,NBA,17.5,17.5,2026-03-22T00:10:00Z,2026-03-21 19:07:55 UTC
-Houston Rockets vs Miami Heat,NBA,2.0,2.0,2026-03-22T00:11:00Z,2026-03-21 19:07:55 UTC
-Dallas Mavericks vs Los Angeles Clippers,NBA,-7.5,-8.0,2026-03-22T00:45:00Z,2026-03-21 19:07:55 UTC
-Philadelphia 76ers vs Utah Jazz,NBA,-5.5,-5.5,2026-03-22T01:40:00Z,2026-03-21 19:07:55 UTC
-Milwaukee Bucks vs Phoenix Suns,NBA,11.5,11.5,2026-03-22T02:11:00Z,2026-03-21 19:07:55 UTC
-Buffalo Sabres vs Los Angeles Kings,NHL,-1.5,-1.5,2026-03-21T20:10:00Z,2026-03-21 19:07:55 UTC
-Dallas Stars vs Minnesota Wild,NHL,-1.5,-1.5,2026-03-21T20:10:00Z,2026-03-21 19:07:55 UTC
-Philadelphia Flyers vs San Jose Sharks,NHL,1.5,1.5,2026-03-21T20:10:00Z,2026-03-21 19:07:55 UTC
-Columbus Blue Jackets vs Seattle Kraken,NHL,1.5,1.5,2026-03-21T21:10:00Z,2026-03-21 19:07:55 UTC
-Montréal Canadiens vs New York Islanders,NHL,1.5,1.5,2026-03-21T23:10:00Z,2026-03-21 19:07:55 UTC
-Ottawa Senators vs Toronto Maple Leafs,NHL,1.5,1.5,2026-03-21T23:10:00Z,2026-03-21 19:07:55 UTC
-St Louis Blues vs Vancouver Canucks,NHL,-1.5,-1.5,2026-03-21T23:10:00Z,2026-03-21 19:07:55 UTC
-Boston Bruins vs Detroit Red Wings,NHL,1.5,1.5,2026-03-22T00:10:00Z,2026-03-21 19:07:55 UTC
-Edmonton Oilers vs Tampa Bay Lightning,NHL,-1.5,-1.5,2026-03-22T02:10:00Z,2026-03-21 19:07:55 UTC
-Duke Blue Devils vs TCU Horned Frogs,NCAA B,11.5,12.5,2026-03-21T21:15:00Z,2026-03-21 19:07:55 UTC
-Houston Cougars vs Texas A&M Aggies,NCAA B,10.5,10.5,2026-03-21T22:10:00Z,2026-03-21 19:07:55 UTC
-Dayton Flyers vs UNC Wilmington Seahawks,NCAA B,-3.5,-3.0,2026-03-21T23:00:00Z,2026-03-21 19:07:55 UTC
-Gonzaga Bulldogs vs Texas Longhorns,NCAA B,6.5,6.5,2026-03-21T23:10:00Z,2026-03-21 19:07:55 UTC
-Illinois Fighting Illini vs VCU Rams,NCAA B,10.5,11.5,2026-03-21T23:50:00Z,2026-03-21 19:07:55 UTC
-Nebraska Cornhuskers vs Vanderbilt Commodores,NCAA B,-1.5,-2.0,2026-03-22T00:45:00Z,2026-03-21 19:07:55 UTC
-Liberty Flames vs Nevada Wolf Pack,NCAA B,7.5,7.5,2026-03-22T01:00:00Z,2026-03-21 19:07:55 UTC
-Arkansas Razorbacks vs High Point Panthers,NCAA B,11.5,12.5,2026-03-22T01:45:00Z,2026-03-21 19:07:55 UTC
-Miami Hurricanes vs Purdue Boilermakers,NCAA B,7.5,7.5,2026-03-22T16:10:00Z,2026-03-21 19:07:55 UTC
-Iowa State Cyclones vs Kentucky Wildcats,NCAA B,4.5,5.0,2026-03-22T18:45:00Z,2026-03-21 19:07:55 UTC
-Illinois St Redbirds vs Wake Forest Demon Deacons,NCAA B,7.5,7.5,2026-03-22T20:30:00Z,2026-03-21 19:07:55 UTC
-Kansas Jayhawks vs St. John's Red Storm,NCAA B,-3.5,-3.5,2026-03-22T21:15:00Z,2026-03-21 19:07:55 UTC
-Tennessee Volunteers vs Virginia Cavaliers,NCAA B,-1.5,-1.0,2026-03-22T22:10:00Z,2026-03-21 19:07:55 UTC
-Auburn Tigers vs Seattle Redhawks,NCAA B,13.5,13.5,2026-03-22T22:30:00Z,2026-03-21 19:07:55 UTC
-Tulsa Golden Hurricane vs UNLV Rebels,NCAA B,4.5,4.5,2026-03-22T23:00:00Z,2026-03-21 19:07:55 UTC
-Florida Gators vs Iowa Hawkeyes,NCAA B,10.5,10.5,2026-03-22T23:10:00Z,2026-03-21 19:07:55 UTC
-Arizona Wildcats vs Utah State Aggies,NCAA B,11.5,11.5,2026-03-22T23:50:00Z,2026-03-21 19:07:55 UTC
-GW Revolutionaries vs New Mexico Lobos,NCAA B,7.5,7.5,2026-03-23T00:00:00Z,2026-03-21 19:07:55 UTC
-Oklahoma St Cowboys vs Wichita St Shockers,NCAA B,3.5,4.0,2026-03-23T00:30:00Z,2026-03-21 19:07:55 UTC
-UCLA Bruins vs UConn Huskies,NCAA B,4.5,4.5,2026-03-23T00:45:00Z,2026-03-21 19:07:55 UTC
-California Golden Bears vs Saint Joseph's Hawks,NCAA B,5.5,5.5,2026-03-23T01:00:00Z,2026-03-21 19:07:55 UTC
-Alabama Crimson Tide vs Texas Tech Red Raiders,NCAA B,1.5,-1.5,2026-03-23T01:45:41Z,2026-03-21 19:07:55 UTC
+Team,Opening_Line,Recorded_At,Sport
+Denver Nuggets,-9.0,2026-03-22 07:59:58,basketball_nba
+Portland Trail Blazers,9.0,2026-03-22 07:59:58,basketball_nba
+Brooklyn Nets,4.5,2026-03-22 07:59:58,basketball_nba
+Sacramento Kings,-4.5,2026-03-22 07:59:58,basketball_nba
+New York Knicks,-20.0,2026-03-22 07:59:58,basketball_nba
+Washington Wizards,20.0,2026-03-22 07:59:58,basketball_nba
+Boston Celtics,-9.5,2026-03-22 07:59:58,basketball_nba
+Minnesota Timberwolves,9.5,2026-03-22 07:59:58,basketball_nba
+Phoenix Suns,2.0,2026-03-22 07:59:58,basketball_nba
+Toronto Raptors,-2.0,2026-03-22 07:59:58,basketball_nba
+Miami Hurricanes,7.5,2026-03-22 07:59:58,basketball_ncaab
+Purdue Boilermakers,-7.5,2026-03-22 07:59:58,basketball_ncaab
+Iowa State Cyclones,-4.5,2026-03-22 07:59:58,basketball_ncaab
+Kentucky Wildcats,4.5,2026-03-22 07:59:58,basketball_ncaab
+Illinois St Redbirds,7.5,2026-03-22 07:59:58,basketball_ncaab
+Wake Forest Demon Deacons,-7.5,2026-03-22 07:59:58,basketball_ncaab
+Kansas Jayhawks,3.5,2026-03-22 07:59:58,basketball_ncaab
+St. John's Red Storm,-3.5,2026-03-22 07:59:58,basketball_ncaab
+Tennessee Volunteers,-1.5,2026-03-22 07:59:58,basketball_ncaab
+Virginia Cavaliers,1.5,2026-03-22 07:59:58,basketball_ncaab
+Auburn Tigers,-13.5,2026-03-22 07:59:58,basketball_ncaab
+Seattle Redhawks,13.5,2026-03-22 07:59:58,basketball_ncaab
+Tulsa Golden Hurricane,-4.5,2026-03-22 07:59:58,basketball_ncaab
+UNLV Rebels,4.5,2026-03-22 07:59:58,basketball_ncaab
+Florida Gators,-10.5,2026-03-22 07:59:58,basketball_ncaab
+Iowa Hawkeyes,10.5,2026-03-22 07:59:58,basketball_ncaab
+Arizona Wildcats,-11.5,2026-03-22 07:59:58,basketball_ncaab
+Utah State Aggies,11.5,2026-03-22 07:59:58,basketball_ncaab
+GW Revolutionaries,7.5,2026-03-22 07:59:58,basketball_ncaab
+New Mexico Lobos,-7.5,2026-03-22 07:59:58,basketball_ncaab
+Oklahoma St Cowboys,-3.5,2026-03-22 07:59:58,basketball_ncaab
+Wichita St Shockers,3.5,2026-03-22 07:59:58,basketball_ncaab
+UCLA Bruins,4.5,2026-03-22 07:59:58,basketball_ncaab
+UConn Huskies,-4.5,2026-03-22 07:59:58,basketball_ncaab
+California Golden Bears,-5.5,2026-03-22 07:59:58,basketball_ncaab
+Saint Joseph's Hawks,5.5,2026-03-22 07:59:58,basketball_ncaab
+Alabama Crimson Tide,-1.5,2026-03-22 07:59:58,basketball_ncaab
+Texas Tech Red Raiders,1.5,2026-03-22 07:59:58,basketball_ncaab
+Houston Cougars,-2.5,2026-03-22 07:59:58,basketball_ncaab
+Illinois Fighting Illini,2.5,2026-03-22 07:59:58,basketball_ncaab
+New York Rangers,1.77,2026-03-22 07:59:58,icehockey_nhl
+Winnipeg Jets,2.08,2026-03-22 07:59:58,icehockey_nhl
+Colorado Avalanche,1.62,2026-03-22 07:59:58,icehockey_nhl
+Washington Capitals,2.32,2026-03-22 07:59:58,icehockey_nhl
+Carolina Hurricanes,1.69,2026-03-22 07:59:58,icehockey_nhl
+Pittsburgh Penguins,2.2,2026-03-22 07:59:58,icehockey_nhl
+Chicago Blackhawks,1.91,2026-03-22 07:59:58,icehockey_nhl
+Nashville Predators,1.91,2026-03-22 07:59:58,icehockey_nhl
+Columbus Blue Jackets,1.88,2026-03-22 07:59:58,icehockey_nhl
+New York Islanders,1.95,2026-03-22 07:59:58,icehockey_nhl
+Dallas Stars,1.68,2026-03-22 07:59:58,icehockey_nhl
+Vegas Golden Knights,2.22,2026-03-22 07:59:58,icehockey_nhl
+Anaheim Ducks,1.93,2026-03-22 07:59:58,icehockey_nhl
+Buffalo Sabres,1.9,2026-03-22 07:59:58,icehockey_nhl
+Calgary Flames,2.52,2026-03-22 07:59:58,icehockey_nhl
+Tampa Bay Lightning,1.54,2026-03-22 07:59:58,icehockey_nhl
+Los Angeles Kings,2.46,2026-03-22 07:59:58,icehockey_nhl
+Utah Mammoth,1.57,2026-03-22 07:59:58,icehockey_nhl
