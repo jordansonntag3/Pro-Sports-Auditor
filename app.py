@@ -59,8 +59,7 @@ def log_to_github_ledger(new_data, overwrite_df=None):
     r = requests.get(url, headers=headers)
     if r.status_code == 200:
         content_data = r.json(); sha = content_data['sha']
-        if overwrite_df is not None: 
-            df = overwrite_df
+        if overwrite_df is not None: df = overwrite_df
         else:
             df = pd.read_csv(StringIO(base64.b64decode(content_data['content']).decode('utf-8')))
             df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
@@ -74,6 +73,65 @@ def log_to_github_ledger(new_data, overwrite_df=None):
     payload = {"message": msg, "content": encoded_content, "branch": "main"}
     if sha: payload["sha"] = sha
     return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
+
+# --- UTILITY: AUTOMATED GRADING ENGINE ---
+def auto_grade_ledger():
+    if not st.session_state.bet_history: return False
+    
+    df = pd.DataFrame(st.session_state.bet_history)
+    pending_mask = df['Result'] == 'Pending'
+    if not pending_mask.any(): return "No pending plays."
+
+    l_map = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
+    
+    # Check each sport involved in pending bets
+    unique_sports = df.loc[pending_mask, 'Sport'].unique()
+    scores_db = {}
+
+    for sport in unique_sports:
+        s_key = l_map.get(sport)
+        if s_key:
+            url = f"https://api.the-odds-api.com/v4/sports/{s_key}/scores/?daysFrom=3&apiKey={api_key}"
+            try:
+                res = requests.get(url).json()
+                for match in res:
+                    if match.get('completed'):
+                        scores_db[match['home_team']] = match['scores']
+                        scores_db[match['away_team']] = match['scores']
+            except: continue
+
+    # Process pending rows
+    updated = False
+    for idx, row in df.loc[pending_mask].iterrows():
+        team = row['Team']
+        if team in scores_db:
+            scores = scores_db[team]
+            # Find which score is ours
+            my_s = next(int(s['score']) for s in scores if s['name'] == team)
+            opp_s = next(int(s['score']) for s in scores if s['name'] != team)
+            
+            line = row['Line']
+            try:
+                # Handle Spreads
+                if any(x in str(line) for x in ['+', '-']) and '.' in str(line):
+                    net = my_s + float(line)
+                    if net > opp_s: res = "Win"
+                    elif net < opp_s: res = "Loss"
+                    else: res = "Push"
+                # Handle Moneyline
+                else:
+                    if my_s > opp_s: res = "Win"
+                    else: res = "Loss"
+                
+                df.at[idx, 'Result'] = res
+                updated = True
+            except: continue
+    
+    if updated:
+        log_to_github_ledger({}, overwrite_df=df)
+        st.session_state.bet_history = df.to_dict('records')
+        return "Grades applied!"
+    return "Scores not available yet."
 
 def delete_last_from_github_ledger():
     repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
@@ -90,7 +148,7 @@ def delete_last_from_github_ledger():
             return requests.put(url, headers=headers, json=payload).status_code in [200, 201]
     return False
 
-# --- SYNC LEDGER FUNCTION ---
+# --- SYNC LEDGER ON STARTUP ---
 def sync_ledger():
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
@@ -122,15 +180,13 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
         payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
         response = requests.post(url, json=payload, timeout=30).json()
-        text = response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.')
-        return text.strip()
+        return response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
     except: return "⚠️ API ERROR"
 
 # --- TABS ---
 tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
 
 with tab1:
-    # 2. Rename and Remove Dropdown
     st.markdown("### 🛠️ Scan Settings")
     col1, col2 = st.columns([1, 1.2])
     with col1:
@@ -219,36 +275,32 @@ with tab1:
 with tab2:
     st.header("📈 Performance Ledger")
     
-    # Add a Refresh button to "Scan" for new entries or updates from GitHub
-    if st.button("🔄 REFRESH LEDGER FROM GITHUB", use_container_width=True):
-        if sync_ledger(): st.toast("Synced with GitHub!")
-        else: st.error("Sync failed.")
+    col_a, col_b = st.columns(2)
+    if col_a.button("🔄 REFRESH LEDGER FROM GITHUB", use_container_width=True):
+        if sync_ledger(): st.toast("Synced!")
         st.rerun()
+    
+    if col_b.button("🤖 AUTO-GRADE PENDING PLAYS", use_container_width=True, type="primary"):
+        with st.spinner("Auditing scores via API..."):
+            status = auto_grade_ledger()
+            st.toast(status)
+            time.sleep(1)
+            st.rerun()
     
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
         
         # Grading Suite
-        with st.container(border=True):
-            st.write("### 📝 Grading Room")
-            st.caption("Pick a result in the table below and hit Save.")
+        with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
             edited_df = st.data_editor(
                 df.iloc[::-1], 
-                column_config={
-                    "Result": st.column_config.SelectboxColumn(
-                        options=["Pending", "Win", "Loss", "Push"]
-                    )
-                }, 
-                use_container_width=True, 
-                hide_index=False
+                column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, 
+                use_container_width=True, hide_index=False
             )
-            
-            if st.button("💾 SAVE ALL GRADES TO GITHUB", use_container_width=True, type="primary"):
-                final_to_save = edited_df.iloc[::-1]
-                if log_to_github_ledger({}, overwrite_df=final_to_save):
-                    st.success("Ledger Updated Successfully!"); time.sleep(1); st.rerun()
+            if st.button("💾 SAVE MANUAL GRADES", use_container_width=True):
+                if log_to_github_ledger({}, overwrite_df=edited_df.iloc[::-1]):
+                    st.success("Updated!"); time.sleep(1); st.rerun()
 
-        # Clean Display View
         st.subheader("Archive View")
         display_df = df.iloc[::-1].copy()
         display_df.index = range(1, len(display_df) + 1)
