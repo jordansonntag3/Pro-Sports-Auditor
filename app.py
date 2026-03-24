@@ -121,7 +121,7 @@ def auto_grade_ledger():
         return "Grades applied successfully!"
     return "Scores for these games aren't finalized yet."
 
-# --- SYNC LEDGER (Auto-Triggered) ---
+# --- SYNC LEDGER ---
 def sync_ledger():
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
@@ -132,7 +132,6 @@ def sync_ledger():
         return True
     except: return False
 
-# AUTO-SYNC PULSE: Runs every 60 seconds automatically
 if time.time() - st.session_state.last_sync > 60:
     sync_ledger()
 
@@ -195,13 +194,21 @@ with tab1:
         new_res = []; discord_messages = []; now_utc = datetime.utcnow(); today_str = datetime.now().strftime("%Y-%m-%d")
         logged_today = [str(b['Team']) for b in st.session_state.bet_history if today_str in str(b['Date'])]
         
+        # --- NEW: CALCULATE MAX HORIZON TIME ---
+        if horizon == "Today": max_time = now_utc + timedelta(hours=24)
+        elif horizon == "Tomorrow": max_time = now_utc + timedelta(hours=48)
+        else: max_time = now_utc + timedelta(hours=72)
+
         for name in selected_leagues:
             s_key, mkt = l_map[name]
             url = f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/"
             try:
                 data = requests.get(url, params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
                 for game in data:
-                    if pd.to_datetime(game['commence_time']).replace(tzinfo=None) < now_utc: continue
+                    commence_time = pd.to_datetime(game['commence_time']).replace(tzinfo=None)
+                    # 1. STOP SCANNING FOR THURSDAY IF WE WANT TODAY
+                    if commence_time < now_utc or commence_time > max_time: continue
+                    
                     away_t, home_t = game['away_team'], game['home_team']
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
@@ -263,15 +270,18 @@ with tab1:
 with tab2:
     st.header("📈 Performance Ledger")
     
-    # --- AUTO-GRADE BUTTON ---
-    if st.button("🤖 AUTO-GRADE PENDING PLAYS", use_container_width=True, type="primary"):
+    col_a, col_b = st.columns(2)
+    if col_a.button("🔄 REFRESH LEDGER FROM GITHUB", use_container_width=True):
+        if sync_ledger(): st.toast("Synced!")
+        st.rerun()
+    
+    if col_b.button("🤖 AUTO-GRADE PENDING PLAYS", use_container_width=True, type="primary"):
         with st.spinner("Scanning for final scores..."):
             status = auto_grade_ledger()
             st.toast(status); time.sleep(1); st.rerun()
     
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
-        
         with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
             edited_df = st.data_editor(
                 df.iloc[::-1], 
