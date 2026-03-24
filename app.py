@@ -141,15 +141,19 @@ with tab1:
     col1, col2 = st.columns([1, 1.2])
     with col1:
         horizon = st.radio("Window:", ["Today", "Next 48 Hours", "Next 3 Days"], horizontal=True)
-        min_pt_edge = st.slider("Min Spread Edge (pts):", 0.0, 1.0, 0.5, 0.1)
-        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 0, 20, 10, 1)
+        # 1. SLIDER MINIMUMS LOCKED
+        min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
+        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
     with col2:
         st.write("**Leagues:**")
-        c1, c2, c3 = st.columns(3); selected_leagues = []
+        # 2. RESTORED BUTTON INTERFACE
+        c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
-        for league in leagues_list:
-            if c1.checkbox(league, value=st.session_state[f"active_{league}"], key=f"cb_{league}"):
-                selected_leagues.append(league)
+        for i, league in enumerate(leagues_list):
+            active = st.session_state[f"active_{league}"]
+            if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t_{league}", use_container_width=True):
+                st.session_state[f"active_{league}"] = not active; st.rerun()
+            if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []; discord_messages = []; today_str = datetime.now().strftime("%Y-%m-%d")
