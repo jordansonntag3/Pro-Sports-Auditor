@@ -141,12 +141,12 @@ with tab1:
     col1, col2 = st.columns([1, 1.2])
     with col1:
         horizon = st.radio("Window:", ["Today", "Next 48 Hours", "Next 3 Days"], horizontal=True)
-        # 1. SLIDER MINIMUMS LOCKED
+        # 1. LOCKED MINIMUMS
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
     with col2:
         st.write("**Leagues:**")
-        # 2. RESTORED BUTTON INTERFACE
+        # 2. 3-COLUMN SPORT BUTTONS
         c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
         for i, league in enumerate(leagues_list):
@@ -216,12 +216,13 @@ with tab1:
             c1.metric("Market Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
             if res['Market'] == 'h2h': c2.metric("Pinnacle Price", to_american(res['PIN']))
             ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
-            if ca.button(f"⚡ Quick Intel", key=f"q_{res['Matchup']}"):
+            # 3. WIDE INTEL BUTTONS
+            if ca.button(f"⚡ Quick Intel", key=f"q_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"iq_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="quick")
-            if cb.button(f"🔎 Detailed Intel", key=f"d_{res['Matchup']}"):
+            if cb.button(f"🔎 Detailed Intel", key=f"d_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="detailed")
             units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"u_{res['Matchup']}")
-            if cd.button(f"✅ LOG", key=f"l_{res['Matchup']}", type="primary"):
+            if cd.button(f"✅ LOG", key=f"l_{res['Matchup']}", type="primary", use_container_width=True):
                 if log_to_github_ledger({"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": display_price, "Edge": f"{res['Edge']:.1f}", "Units": units, "Result": "Pending"}):
                     st.toast("Saved!"); time.sleep(0.5); st.rerun()
             if f"iq_{res['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}"])
