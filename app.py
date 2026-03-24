@@ -32,7 +32,6 @@ if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
 if "last_sync" not in st.session_state: st.session_state.last_sync = 0
-if "debug_report" not in st.session_state: st.session_state.debug_report = {}
 
 leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
@@ -140,13 +139,12 @@ with tab1:
     st.markdown("### 🛠️ Scan Settings")
     col1, col2 = st.columns([1, 1.2])
     with col1:
-        horizon = st.radio("Window:", ["Today", "Next 48 Hours", "Next 3 Days"], horizontal=True)
-        # 1. LOCKED MINIMUMS
+        # RESTORED: Today, Tomorrow, Next 48 Hours
+        horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
     with col2:
         st.write("**Leagues:**")
-        # 2. 3-COLUMN SPORT BUTTONS
         c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
         for i, league in enumerate(leagues_list):
@@ -159,9 +157,14 @@ with tab1:
         new_res = []; discord_messages = []; today_str = datetime.now().strftime("%Y-%m-%d")
         debug = {"Total": 0, "Started": 0, "Time_Filtered": 0, "Missing_Odds": 0, "Low_Value": 0}
         now_central = datetime.now(pytz.timezone('US/Central'))
-        if horizon == "Today": max_time = now_central.replace(hour=23, minute=59)
-        elif horizon == "Next 48 Hours": max_time = now_central + timedelta(hours=48)
-        else: max_time = now_central + timedelta(hours=72)
+        
+        # UPDATED HORIZON LOGIC
+        if horizon == "Today": 
+            max_time = now_central.replace(hour=23, minute=59, second=59)
+        elif horizon == "Tomorrow":
+            max_time = (now_central + timedelta(days=1)).replace(hour=23, minute=59, second=59)
+        else:
+            max_time = now_central + timedelta(hours=48)
 
         logged_today = [str(b['Team']) for b in st.session_state.bet_history if today_str in str(b['Date'])]
         for name in selected_leagues:
@@ -216,7 +219,7 @@ with tab1:
             c1.metric("Market Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
             if res['Market'] == 'h2h': c2.metric("Pinnacle Price", to_american(res['PIN']))
             ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
-            # 3. WIDE INTEL BUTTONS
+            # WIDE BUTTONS RESTORED
             if ca.button(f"⚡ Quick Intel", key=f"q_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"iq_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="quick")
             if cb.button(f"🔎 Detailed Intel", key=f"d_{res['Matchup']}", use_container_width=True):
