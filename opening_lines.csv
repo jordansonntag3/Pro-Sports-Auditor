@@ -1,39 +1,67 @@
 Team,Opening_Line,Recorded_At,Sport
-Detroit Pistons,2.0,2026-03-23 10:33:14,basketball_nba
-Los Angeles Lakers,-2.0,2026-03-23 10:33:14,basketball_nba
-Indiana Pacers,13.0,2026-03-23 10:33:14,basketball_nba
-Orlando Magic,-13.0,2026-03-23 10:33:14,basketball_nba
-Miami Heat,5.0,2026-03-23 10:33:14,basketball_nba
-San Antonio Spurs,-5.0,2026-03-23 10:33:14,basketball_nba
-Oklahoma City Thunder,-15.5,2026-03-23 10:33:14,basketball_nba
-Philadelphia 76ers,15.5,2026-03-23 10:33:14,basketball_nba
-Atlanta Hawks,-14.0,2026-03-23 10:33:14,basketball_nba
-Memphis Grizzlies,14.0,2026-03-23 10:33:14,basketball_nba
-Chicago Bulls,8.0,2026-03-23 10:33:14,basketball_nba
-Houston Rockets,-8.0,2026-03-23 10:33:14,basketball_nba
-Toronto Raptors,-13.0,2026-03-23 10:33:14,basketball_nba
-Utah Jazz,13.0,2026-03-23 10:33:14,basketball_nba
-Dallas Mavericks,2.5,2026-03-23 10:33:14,basketball_nba
-Golden State Warriors,-2.5,2026-03-23 10:33:14,basketball_nba
-Brooklyn Nets,14.5,2026-03-23 10:33:14,basketball_nba
-Portland Trail Blazers,-14.5,2026-03-23 10:33:14,basketball_nba
-Los Angeles Clippers,-13.5,2026-03-23 10:33:14,basketball_nba
-Milwaukee Bucks,13.5,2026-03-23 10:33:14,basketball_nba
-Purdue Boilermakers,-7.5,2026-03-23 10:33:14,basketball_ncaab
-Texas Longhorns,7.5,2026-03-23 10:33:14,basketball_ncaab
-Iowa Hawkeyes,2.5,2026-03-23 10:33:14,basketball_ncaab
-Nebraska Cornhuskers,-2.5,2026-03-23 10:33:14,basketball_ncaab
-Arizona Wildcats,-8.5,2026-03-23 10:33:14,basketball_ncaab
-Arkansas Razorbacks,8.5,2026-03-23 10:33:14,basketball_ncaab
-Houston Cougars,-2.5,2026-03-23 10:33:14,basketball_ncaab
-Illinois Fighting Illini,2.5,2026-03-23 10:33:14,basketball_ncaab
-Duke Blue Devils,-6.5,2026-03-23 10:33:14,basketball_ncaab
-St. John's Red Storm,6.5,2026-03-23 10:33:14,basketball_ncaab
-Alabama Crimson Tide,10.5,2026-03-23 10:33:14,basketball_ncaab
-Michigan Wolverines,-10.5,2026-03-23 10:33:14,basketball_ncaab
-Michigan St Spartans,1.5,2026-03-23 10:33:14,basketball_ncaab
-UConn Huskies,-1.5,2026-03-23 10:33:14,basketball_ncaab
-Iowa State Cyclones,-3.5,2026-03-23 10:33:14,basketball_ncaab
-Tennessee Volunteers,3.5,2026-03-23 10:33:14,basketball_ncaab
-New York Rangers,2.58,2026-03-23 10:33:14,icehockey_nhl
-Ottawa Senators,1.52,2026-03-23 10:33:14,icehockey_nhl
+Charlotte Hornets,-17.0,2026-03-24 10:10:50,basketball_nba
+Sacramento Kings,17.0,2026-03-24 10:10:50,basketball_nba
+New Orleans Pelicans,8.5,2026-03-24 10:10:50,basketball_nba
+New York Knicks,-8.5,2026-03-24 10:10:50,basketball_nba
+Cleveland Cavaliers,-10.0,2026-03-24 10:10:50,basketball_nba
+Orlando Magic,10.0,2026-03-24 10:10:50,basketball_nba
+Denver Nuggets,-5.0,2026-03-24 10:10:50,basketball_nba
+Phoenix Suns,5.0,2026-03-24 10:10:50,basketball_nba
+Boston Celtics,2.5,2026-03-24 10:10:50,basketball_nba
+Oklahoma City Thunder,-2.5,2026-03-24 10:10:50,basketball_nba
+Houston Rockets,-1.0,2026-03-24 10:10:50,basketball_nba
+Minnesota Timberwolves,1.0,2026-03-24 10:10:50,basketball_nba
+Tulsa Golden Hurricane,-3.5,2026-03-24 10:10:50,basketball_ncaab
+Wichita St Shockers,3.5,2026-03-24 10:10:50,basketball_ncaab
+New Mexico Lobos,-11.5,2026-03-24 10:10:50,basketball_ncaab
+Saint Joseph's Hawks,11.5,2026-03-24 10:10:50,basketball_ncaab
+Dayton Flyers,-7.5,2026-03-24 10:10:50,basketball_ncaab
+Illinois St Redbirds,7.5,2026-03-24 10:10:50,basketball_ncaab
+Auburn Tigers,-9.5,2026-03-24 10:10:50,basketball_ncaab
+Nevada Wolf Pack,9.5,2026-03-24 10:10:50,basketball_ncaab
+Purdue Boilermakers,-6.5,2026-03-24 10:10:50,basketball_ncaab
+Texas Longhorns,6.5,2026-03-24 10:10:50,basketball_ncaab
+Iowa Hawkeyes,1.5,2026-03-24 10:10:50,basketball_ncaab
+Nebraska Cornhuskers,-1.5,2026-03-24 10:10:50,basketball_ncaab
+Arizona Wildcats,-7.5,2026-03-24 10:10:50,basketball_ncaab
+Arkansas Razorbacks,7.5,2026-03-24 10:10:50,basketball_ncaab
+Houston Cougars,-3.5,2026-03-24 10:10:50,basketball_ncaab
+Illinois Fighting Illini,3.5,2026-03-24 10:10:50,basketball_ncaab
+Duke Blue Devils,-6.5,2026-03-24 10:10:50,basketball_ncaab
+St. John's Red Storm,6.5,2026-03-24 10:10:50,basketball_ncaab
+Alabama Crimson Tide,10.5,2026-03-24 10:10:50,basketball_ncaab
+Michigan Wolverines,-10.5,2026-03-24 10:10:50,basketball_ncaab
+Michigan St Spartans,1.5,2026-03-24 10:10:50,basketball_ncaab
+UConn Huskies,-1.5,2026-03-24 10:10:50,basketball_ncaab
+Iowa State Cyclones,-4.5,2026-03-24 10:10:50,basketball_ncaab
+Tennessee Volunteers,4.5,2026-03-24 10:10:50,basketball_ncaab
+Boston Bruins,1.52,2026-03-24 10:10:50,icehockey_nhl
+Toronto Maple Leafs,2.58,2026-03-24 10:10:50,icehockey_nhl
+Carolina Hurricanes,1.69,2026-03-24 10:10:50,icehockey_nhl
+Montréal Canadiens,2.2,2026-03-24 10:10:50,icehockey_nhl
+Chicago Blackhawks,2.62,2026-03-24 10:10:50,icehockey_nhl
+New York Islanders,1.51,2026-03-24 10:10:50,icehockey_nhl
+Colorado Avalanche,1.64,2026-03-24 10:10:50,icehockey_nhl
+Pittsburgh Penguins,2.3,2026-03-24 10:10:50,icehockey_nhl
+Columbus Blue Jackets,1.72,2026-03-24 10:10:50,icehockey_nhl
+Philadelphia Flyers,2.15,2026-03-24 10:10:50,icehockey_nhl
+Detroit Red Wings,1.8,2026-03-24 10:10:50,icehockey_nhl
+Ottawa Senators,2.04,2026-03-24 10:10:50,icehockey_nhl
+Florida Panthers,1.75,2026-03-24 10:10:50,icehockey_nhl
+Seattle Kraken,2.12,2026-03-24 10:10:50,icehockey_nhl
+Minnesota Wild,2.42,2026-03-24 10:10:50,icehockey_nhl
+Tampa Bay Lightning,1.58,2026-03-24 10:10:50,icehockey_nhl
+Dallas Stars,1.59,2026-03-24 10:10:50,icehockey_nhl
+New Jersey Devils,2.4,2026-03-24 10:10:50,icehockey_nhl
+Nashville Predators,1.68,2026-03-24 10:10:50,icehockey_nhl
+San Jose Sharks,2.22,2026-03-24 10:10:50,icehockey_nhl
+St Louis Blues,1.96,2026-03-24 10:10:50,icehockey_nhl
+Washington Capitals,1.87,2026-03-24 10:10:50,icehockey_nhl
+Vegas Golden Knights,1.78,2026-03-24 10:10:50,icehockey_nhl
+Winnipeg Jets,2.06,2026-03-24 10:10:50,icehockey_nhl
+Calgary Flames,2.22,2026-03-24 10:10:50,icehockey_nhl
+Los Angeles Kings,1.68,2026-03-24 10:10:50,icehockey_nhl
+Edmonton Oilers,2.14,2026-03-24 10:10:50,icehockey_nhl
+Utah Mammoth,1.73,2026-03-24 10:10:50,icehockey_nhl
+Anaheim Ducks,1.54,2026-03-24 10:10:50,icehockey_nhl
+Vancouver Canucks,2.52,2026-03-24 10:10:50,icehockey_nhl
