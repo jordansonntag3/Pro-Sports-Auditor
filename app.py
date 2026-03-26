@@ -78,29 +78,26 @@ def sync_ledger():
 
 if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
-def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
+def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
-    cached_news = st.session_state.search_ledger.get(matchup)
-    should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
     
-    # Handle Missing Pinnacle in Prompt
     pin_context = f"vs Pinnacle {pin_p}" if pin_p else "(Pinnacle is currently locked/unavailable)"
-    math_context = f"Math Edge: {edge} {edge_label}" if pin_p else "Focus on matchup analysis as Pinnacle is locked."
+    math_context = f"Math Edge: {edge} {edge_label}" if pin_p else "Pinnacle locked—focus on purely situational analysis."
     
     prompt = f"""
     ROLE: Professional Betting Analyst & Scout.
     GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} {pin_context}. {math_context}.
     
     STRUCTURE:
-    - **PROS**: The bull case for this bet (matchups, home court, return of players, etc).
-    - **CONS**: The bear case/risks (injuries, sharp opposition, fatigue, etc).
-    - **THE CASE**: Balanced analysis focused on situational context and making an informed decision.
+    - **PROS**: Case for this bet winning (matchups, home court, return of players, etc).
+    - **CONS**: Reasons for caution (injuries, sharp opposition, schedule fatigue, etc).
+    - **THE CASE**: Balanced synthesis. Acknowledge the house edge and focus on making an informed decision.
     - **VERDICT**: Final bold verdict (🟢 PLAY, 🟡 WAIT, or 🛑 PASS).
     """
     
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
-    if should_search: payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
+    if grounding_mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
         response = requests.post(url, json=payload, timeout=30).json()
         return response.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', '🔍 No Data.').strip()
@@ -114,13 +111,10 @@ with tab1:
     col1, col2 = st.columns([1, 1.2])
     with col1:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-        # --- THE "INTEL ONLY" SELECT SLIDERS ---
         pt_options = ["Intel Only"] + [round(x * 0.1, 1) for x in range(1, 16)]
         ml_options = ["Intel Only"] + list(range(1, 31))
-        
         min_pt_edge = st.select_slider("Min Spread Edge (pts):", options=pt_options, value=0.5)
         min_ml_edge = st.select_slider("Min NHL ML Edge (cents):", options=ml_options, value=10)
-        
     with col2:
         st.write("**Leagues:**")
         c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
@@ -148,12 +142,24 @@ with tab1:
                     audit["Total"] += 1
                     comm_utc = pd.to_datetime(game['commence_time']).tz_convert('UTC')
                     comm_c = comm_utc.astimezone(pytz.timezone('US/Central'))
-                    if comm_c < now_central: audit["Started"] += 1; continue
-                    if comm_c > max_time: audit["Horizon"] += 1; continue
+                    
+                    # 1. HARD GATE: NO STARTED GAMES (Always applies)
+                    if comm_c < now_central: 
+                        audit["Started"] += 1; continue
+                    
+                    is_ml = (mkt == 'h2h')
+                    mode_is_intel = (min_ml_edge == "Intel Only" if is_ml else min_pt_edge == "Intel Only")
+
+                    # 2. HORIZON GATE: (Bypass if Intel Only)
+                    if not mode_is_intel:
+                        if comm_c > max_time: audit["Horizon"] += 1; continue
                     
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
-                        for o in b.get('markets', [{}])[0].get('outcomes', []):
+                        m_list = b.get('markets', [])
+                        if not m_list: continue
+                        mkts = m_list[0].get('outcomes', [])
+                        for o in mkts:
                             v = o.get('point') if mkt == 'spreads' else o.get('price')
                             if o['name'] == game['away_team']:
                                 if b['key'] == 'fanduel': fd_a = v
@@ -162,28 +168,18 @@ with tab1:
                                 if b['key'] == 'fanduel': fd_h = v
                                 elif b['key'] == 'pinnacle': pin_h = v
                     
-                    # 1. Require FanDuel (always)
-                    if fd_a is None or fd_h is None: continue
+                    if fd_a is None or fd_h is None: continue 
                     
-                    # 2. Check Pinnacle
-                    pin_missing = (pin_a is None or pin_h is None)
-                    
-                    # 3. INTEL ONLY LOGIC
-                    is_ml = (mkt == 'h2h')
-                    mode_is_intel = (min_ml_edge == "Intel Only" if is_ml else min_pt_edge == "Intel Only")
-                    
-                    if pin_missing and not mode_is_intel:
+                    # 3. PINNACLE GATE: (Bypass if Intel Only)
+                    if not mode_is_intel and (pin_a is None or pin_h is None):
                         audit["NoLines"] += 1; continue
                     
-                    # Math Edge Calculation
-                    if not pin_missing:
+                    edge_a, edge_h = 0.0, 0.0
+                    if pin_a is not None and pin_h is not None:
                         edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
                         if is_ml: edge_a, edge_h = edge_a * 100, edge_h * 100
-                    else:
-                        edge_a, edge_h = 0.0, 0.0 # No math edge if book is locked
                     
-                    if mode_is_intel:
-                        show_game = True
+                    if mode_is_intel: show_game = True
                     else:
                         floor = (min_ml_edge if is_ml else min_pt_edge) - 0.01
                         show_game = edge_a >= floor or edge_h >= floor
@@ -198,7 +194,6 @@ with tab1:
         st.session_state.audit_data = audit
         st.rerun()
 
-    # --- UI RENDERING ---
     if st.session_state.get("audit_data"):
         a = st.session_state.audit_data
         with st.container(border=True):
@@ -223,4 +218,20 @@ with tab1:
                 st.session_state[f"iq_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key)
             if cb.button(f"🔎 Detailed Intel", key=f"d_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key)
-            # ... (Log play and rest of UI remains the same)
+            units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"u_{res['Matchup']}")
+            if cd.button(f"✅ LOG", key=f"l_{res['Matchup']}", type="primary", use_container_width=True):
+                if log_to_github_ledger({"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": units, "Result": "Pending"}):
+                    st.toast("Saved!"); time.sleep(0.5); st.rerun()
+            if f"iq_{res['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}"])
+            if f"id_{res['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}"])
+
+with tab2:
+    st.header("📈 Performance Ledger")
+    if st.session_state.bet_history:
+        df = pd.DataFrame(st.session_state.bet_history)
+        with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
+            edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
+            if st.button("💾 SAVE MANUAL GRADES"):
+                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
+        display_df = df.iloc[::-1].copy(); display_df.index = range(1, len(display_df) + 1)
+        st.dataframe(display_df, use_container_width=True)
