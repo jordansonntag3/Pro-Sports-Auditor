@@ -118,13 +118,25 @@ def auto_grade_ledger():
         return "Grades applied!"
     return "Scores not available yet."
 
+# --- UPDATED: THE PRO/CON DEBATE ENGINE ---
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key, mode="detailed"):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     edge_label = "cents" if sport == "NHL" else "points"
     cached_news = st.session_state.search_ledger.get(matchup)
     should_search = (grounding_mode == "Live Search") or (grounding_mode == "Session Cache Only" and not cached_news)
-    verdict_rules = f"1. Key player on TARGET ({target_team}) is 'Q' -> **🟡 WAIT**. 2. Key player on OPPOSING is 'Q' -> NO WAIT. 3. Standard: **🛑 PASS**, **⚪ NEUTRAL**, **🟢 PLAY**, **⚡ SMASH**."
-    prompt = f"ROLE: Strategic Betting Analyst. GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} (vs Pin {pin_p}). MATH EDGE: {edge} {edge_label}. FORMAT: {verdict_rules}. End with bold verdict."
+    
+    prompt = f"""
+    ROLE: Professional Sports Analyst & Scout.
+    GAME: {matchup} ({sport}) | TARGET BET: {target_team} {fd_p} (Math Edge: {edge} {edge_label}).
+    
+    TASK: Provide a balanced, no-nonsense analysis of this specific bet. 
+    STRUCTURE:
+    - **PROS**: List the reasons why this bet should win (e.g., math edge, favorable matchup, home court, opponent fatigue, return of players).
+    - **CONS**: List the reasons why this bet is dangerous (e.g., key injuries to target, situational trap, sharp money movement, schedule fatigue).
+    - **THE CASE**: Synthesize the pros and cons. Acknowledge that beating Vegas is extremely difficult and focus on making an informed decision.
+    - **VERDICT**: End with a bold final verdict (🟢 PLAY, 🟡 WAIT, or 🛑 PASS).
+    """
+    
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if should_search: payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
@@ -139,7 +151,6 @@ with tab1:
     st.markdown("### 🛠️ Scan Settings")
     col1, col2 = st.columns([1, 1.2])
     with col1:
-        # RESTORED: Today, Tomorrow, Next 48 Hours
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
@@ -155,16 +166,10 @@ with tab1:
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []; discord_messages = []; today_str = datetime.now().strftime("%Y-%m-%d")
-        debug = {"Total": 0, "Started": 0, "Time_Filtered": 0, "Missing_Odds": 0, "Low_Value": 0}
         now_central = datetime.now(pytz.timezone('US/Central'))
-        
-        # UPDATED HORIZON LOGIC
-        if horizon == "Today": 
-            max_time = now_central.replace(hour=23, minute=59, second=59)
-        elif horizon == "Tomorrow":
-            max_time = (now_central + timedelta(days=1)).replace(hour=23, minute=59, second=59)
-        else:
-            max_time = now_central + timedelta(hours=48)
+        if horizon == "Today": max_time = now_central.replace(hour=23, minute=59)
+        elif horizon == "Tomorrow": max_time = (now_central + timedelta(days=1)).replace(hour=23, minute=59)
+        else: max_time = now_central + timedelta(hours=48)
 
         logged_today = [str(b['Team']) for b in st.session_state.bet_history if today_str in str(b['Date'])]
         for name in selected_leagues:
@@ -172,11 +177,10 @@ with tab1:
             try:
                 data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
                 for game in data:
-                    debug["Total"] += 1
                     comm_utc = pd.to_datetime(game['commence_time']).tz_convert('UTC')
                     comm_c = comm_utc.astimezone(pytz.timezone('US/Central'))
-                    if comm_c < now_central: debug["Started"] += 1; continue
-                    if comm_c > max_time: debug["Time_Filtered"] += 1; continue
+                    if comm_c < now_central: continue
+                    if comm_c > max_time: continue
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
                         mkts = b.get('markets', [{}])[0].get('outcomes', [])
@@ -188,7 +192,7 @@ with tab1:
                             elif o['name'] == game['home_team']:
                                 if b['key'] == 'fanduel': fd_h = v
                                 elif b['key'] == 'pinnacle': pin_h = v
-                    if any(v is None for v in [fd_a, pin_a, fd_h, pin_h]): debug["Missing_Odds"] += 1; continue
+                    if any(v is None for v in [fd_a, pin_a, fd_h, pin_h]): continue
                     edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
                     if mkt == 'h2h': edge_a, edge_h = edge_a * 100, edge_h * 100
                     floor = (min_ml_edge if mkt == 'h2h' else min_pt_edge) - 0.01
@@ -200,15 +204,9 @@ with tab1:
                             discord_messages.append(f"- **{t_team}** {line_str} | Edge: {edge:.1f} ({name})")
                             st.session_state.sent_alerts.add(alert_fp)
                         new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": (pin_a if t_team==game['away_team'] else pin_h), "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%m/%d %I:%M %p')})
-                    else: debug["Low_Value"] += 1
             except: continue
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
-        st.session_state.debug_report = debug
         if discord_messages and discord_live_url: requests.post(discord_live_url, json={"content": "📢 **LIVE VALUE FOUND:**\n" + "\n".join(discord_messages)})
-
-    if st.session_state.get("debug_report"):
-        d = st.session_state.debug_report
-        st.write(f"📊 **Raw Pulse:** Found {d['Total']} games. (Skipped: {d['Started']} Started | {d['Time_Filtered']} Future | {d['Missing_Odds']} Odds Missing | {d['Low_Value']} Low Edge)")
 
     for res in st.session_state.scan_results:
         with st.container(border=True):
@@ -219,7 +217,6 @@ with tab1:
             c1.metric("Market Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
             if res['Market'] == 'h2h': c2.metric("Pinnacle Price", to_american(res['PIN']))
             ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
-            # WIDE BUTTONS RESTORED
             if ca.button(f"⚡ Quick Intel", key=f"q_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"iq_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key, mode="quick")
             if cb.button(f"🔎 Detailed Intel", key=f"d_{res['Matchup']}", use_container_width=True):
@@ -242,6 +239,7 @@ with tab2:
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
         with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
+            # FIXED: SelectboxColumn used correctly
             edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
             if st.button("💾 SAVE MANUAL GRADES"):
                 if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
