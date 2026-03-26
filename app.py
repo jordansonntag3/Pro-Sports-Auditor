@@ -126,7 +126,7 @@ with tab1:
             if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
-        new_res = []; audit = {"Total": 0, "Started": 0, "Horizon": 0, "NoFD": 0, "Efficient": 0, "Hits": 0}
+        new_res = []; audit = {"Total": 0, "Started": 0, "Horizon": 0, "NoLines": 0, "Efficient": 0, "Hits": 0}
         now_central = datetime.now(pytz.timezone('US/Central'))
         today_str = datetime.now().strftime("%Y-%m-%d")
         
@@ -137,26 +137,20 @@ with tab1:
         for name in selected_leagues:
             s_key, mkt = l_map[name]
             try:
-                # REMOVED bookmaker filter from API URL to get a broader net of games
-                url = f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/"
-                params = {"apiKey": api_key, "regions": "us", "markets": mkt}
-                data = requests.get(url, params=params).json()
-                
-                if not isinstance(data, list): continue
-                
+                data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
                 for game in data:
                     audit["Total"] += 1
                     comm_utc = pd.to_datetime(game['commence_time']).tz_convert('UTC')
                     comm_c = comm_utc.astimezone(pytz.timezone('US/Central'))
                     
-                    # 1. HARD GATE: NO STARTED GAMES
+                    # 1. HARD GATE: NO STARTED GAMES (Always applies)
                     if comm_c < now_central: 
                         audit["Started"] += 1; continue
                     
                     is_ml = (mkt == 'h2h')
                     mode_is_intel = (min_ml_edge == "Intel Only" if is_ml else min_pt_edge == "Intel Only")
 
-                    # 2. HORIZON GATE (Bypass if Intel Only)
+                    # 2. HORIZON GATE: (Bypass if Intel Only)
                     if not mode_is_intel:
                         if comm_c > max_time: audit["Horizon"] += 1; continue
                     
@@ -174,29 +168,27 @@ with tab1:
                                 if b['key'] == 'fanduel': fd_h = v
                                 elif b['key'] == 'pinnacle': pin_h = v
                     
-                    # TRUE MASTER OVERRIDE:
-                    # If Intel Mode is on, we show the game even if FD is missing or Pin is missing.
-                    if mode_is_intel:
-                        audit["Hits"] += 1
-                        # If FanDuel is missing, we use 1.0/0.0 as placeholders
-                        t_team = game['away_team']
-                        price = fd_a if fd_a else 1.0 
-                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_a, "Edge": 0.0, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%m/%d %I:%M %p')})
-                    else:
-                        # Standard Math Mode: Require FD and Pin
-                        if fd_a is None or pin_a is None:
-                            audit["NoFD"] += 1; continue
-                        
+                    if fd_a is None or fd_h is None: continue 
+                    
+                    # 3. PINNACLE GATE: (Bypass if Intel Only)
+                    if not mode_is_intel and (pin_a is None or pin_h is None):
+                        audit["NoLines"] += 1; continue
+                    
+                    edge_a, edge_h = 0.0, 0.0
+                    if pin_a is not None and pin_h is not None:
                         edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
                         if is_ml: edge_a, edge_h = edge_a * 100, edge_h * 100
-                        
+                    
+                    if mode_is_intel: show_game = True
+                    else:
                         floor = (min_ml_edge if is_ml else min_pt_edge) - 0.01
-                        if edge_a >= floor or edge_h >= floor:
-                            audit["Hits"] += 1
-                            t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
-                            new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%m/%d %I:%M %p')})
-                        else:
-                            audit["Efficient"] += 1
+                        show_game = edge_a >= floor or edge_h >= floor
+                    
+                    if show_game:
+                        audit["Hits"] += 1
+                        t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
+                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%m/%d %I:%M %p')})
+                    else: audit["Efficient"] += 1
             except: continue
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
         st.session_state.audit_data = audit
