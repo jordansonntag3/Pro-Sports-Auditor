@@ -162,6 +162,17 @@ with tab1:
         st.session_state.audit_data = audit
         st.rerun()
 
+    # RESTORED: THE AUDIT DISPLAY UI
+    if st.session_state.get("audit_data"):
+        a = st.session_state.audit_data
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total Scanned", a['Total'])
+            c2.metric("Value Hits", a['Hits'])
+            c3.metric("Discarded", a['Total'] - a['Hits'])
+            with st.expander("🔍 Discard Breakdown"):
+                st.write(f"- {a['Started']} Started | {a['Horizon']} Outside Horizon | {a['NoLines']} Missing Lines | {a['Efficient']} Efficient/No Edge")
+
     for res in st.session_state.scan_results:
         with st.container(border=True):
             price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
@@ -182,7 +193,7 @@ with tab1:
             if f"iq_{res['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}"])
             if f"id_{res['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}"])
 
-# --- TAB 2: INTEL SCOUT (THE NEW OVERRIDE) ---
+# --- TAB 2: INTEL SCOUT ---
 with tab2:
     st.markdown("### 🧠 Master Scout Board")
     st.info("This tab bypasses math filters. It shows all upcoming games for the day that haven't started.")
@@ -194,10 +205,12 @@ with tab2:
                 data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us", "markets": mkt}).json()
                 for game in data:
                     comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
-                    if comm_c < now_c: continue # ONLY filter out games that started
+                    if comm_c < now_c: continue 
                     fd_a, pin_a = None, None
                     for b in game.get('bookmakers', []):
-                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
+                        m_list = b.get('markets', [])
+                        if not m_list: continue
+                        mkts = m_list[0].get('outcomes', [])
                         for o in mkts:
                             if o['name'] == game['away_team']:
                                 if b['key'] == 'fanduel': fd_a = o.get('point') if mkt == 'spreads' else o.get('price')
@@ -211,9 +224,9 @@ with tab2:
             st.subheader(game['Matchup'])
             st.caption(f"🕒 Starts at {game['Start']} | {game['Sport']}")
             c1, c2 = st.columns(2)
-            if ca := c1.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}", use_container_width=True):
+            if c1.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}", use_container_width=True):
                 st.session_state[f"iq_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Market'], game['Target'], game['FD'], game['PIN'], 0.0, gemini_key)
-            if cb := c2.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}", use_container_width=True):
+            if c2.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}", use_container_width=True):
                 st.session_state[f"id_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Market'], game['Target'], game['FD'], game['PIN'], 0.0, gemini_key)
             if f"iq_{game['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{game['Matchup']}"])
             if f"id_{game['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}"])
@@ -221,7 +234,15 @@ with tab2:
 # --- TAB 3: PERFORMANCE LEDGER ---
 with tab3:
     st.header("📈 Performance Ledger")
+    col_a, col_b = st.columns(2)
+    if col_a.button("🔄 REFRESH FROM GITHUB", use_container_width=True):
+        if sync_ledger(): st.toast("Synced!")
+        st.rerun()
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
+        with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
+            edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
+            if st.button("💾 SAVE MANUAL GRADES"):
+                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
         display_df = df.iloc[::-1].copy(); display_df.index = range(1, len(display_df) + 1)
         st.dataframe(display_df, use_container_width=True)
