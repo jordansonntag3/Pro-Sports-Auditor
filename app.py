@@ -29,6 +29,7 @@ st.title("💥 BANG! Button")
 # 3. Session State Initialization
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
+if "intel_results" not in st.session_state: st.session_state.intel_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
 if "bet_history" not in st.session_state: st.session_state.bet_history = []
 if "last_sync" not in st.session_state: st.session_state.last_sync = 0
@@ -80,22 +81,16 @@ if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
-    edge_label = "cents" if sport == "NHL" else "points"
-    
-    pin_context = f"vs Pinnacle {pin_p}" if pin_p else "(Pinnacle is currently locked/unavailable)"
-    math_context = f"Math Edge: {edge} {edge_label}" if pin_p else "Pinnacle locked—focus on purely situational analysis."
-    
+    pin_context = f"vs Pinnacle {pin_p}" if pin_p else "(Pinnacle Locked/Missing)"
     prompt = f"""
     ROLE: Professional Betting Analyst & Scout.
-    GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} {pin_context}. {math_context}.
-    
+    GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} {pin_context}.
     STRUCTURE:
-    - **PROS**: Case for this bet winning (matchups, home court, return of players, etc).
-    - **CONS**: Reasons for caution (injuries, sharp opposition, schedule fatigue, etc).
-    - **THE CASE**: Balanced synthesis. Acknowledge the house edge and focus on making an informed decision.
+    - **PROS**: The bull case for this bet.
+    - **CONS**: The bear case/risks.
+    - **THE CASE**: Balanced analysis of the matchup context.
     - **VERDICT**: Final bold verdict (🟢 PLAY, 🟡 WAIT, or 🛑 PASS).
     """
-    
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if grounding_mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
@@ -104,32 +99,29 @@ def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge
     except: return "⚠️ API ERROR"
 
 # --- TABS ---
-tab1, tab2 = st.tabs(["🚀 Strategic Scanner", "📊 Performance Ledger"])
+tab1, tab2, tab3 = st.tabs(["🚀 Strategic Scanner", "🧠 Intel Scout", "📊 Performance Ledger"])
 
+# --- TAB 1: MATH SCANNER ---
 with tab1:
-    st.markdown("### 🛠️ Scan Settings")
+    st.markdown("### 🛠️ Math-Edge Settings")
     col1, col2 = st.columns([1, 1.2])
     with col1:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
-        pt_options = ["Intel Only"] + [round(x * 0.1, 1) for x in range(1, 16)]
-        ml_options = ["Intel Only"] + list(range(1, 31))
-        min_pt_edge = st.select_slider("Min Spread Edge (pts):", options=pt_options, value=0.5)
-        min_ml_edge = st.select_slider("Min NHL ML Edge (cents):", options=ml_options, value=10)
+        min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
+        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
     with col2:
         st.write("**Leagues:**")
         c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
         for i, league in enumerate(leagues_list):
             active = st.session_state[f"active_{league}"]
-            if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t_{league}", use_container_width=True):
+            if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t1_{league}", use_container_width=True):
                 st.session_state[f"active_{league}"] = not active; st.rerun()
             if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
-    if st.button("🚀 RUN SCAN", use_container_width=True):
+    if st.button("🚀 RUN MATH SCAN", use_container_width=True):
         new_res = []; audit = {"Total": 0, "Started": 0, "Horizon": 0, "NoLines": 0, "Efficient": 0, "Hits": 0}
         now_central = datetime.now(pytz.timezone('US/Central'))
-        today_str = datetime.now().strftime("%Y-%m-%d")
-        
         if horizon == "Today": max_time = now_central.replace(hour=23, minute=59)
         elif horizon == "Tomorrow": max_time = (now_central + timedelta(days=1)).replace(hour=23, minute=59)
         else: max_time = now_central + timedelta(hours=48)
@@ -140,25 +132,13 @@ with tab1:
                 data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
                 for game in data:
                     audit["Total"] += 1
-                    comm_utc = pd.to_datetime(game['commence_time']).tz_convert('UTC')
-                    comm_c = comm_utc.astimezone(pytz.timezone('US/Central'))
-                    
-                    # 1. HARD GATE: NO STARTED GAMES (Always applies)
-                    if comm_c < now_central: 
-                        audit["Started"] += 1; continue
-                    
-                    is_ml = (mkt == 'h2h')
-                    mode_is_intel = (min_ml_edge == "Intel Only" if is_ml else min_pt_edge == "Intel Only")
-
-                    # 2. HORIZON GATE: (Bypass if Intel Only)
-                    if not mode_is_intel:
-                        if comm_c > max_time: audit["Horizon"] += 1; continue
+                    comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
+                    if comm_c < now_central: audit["Started"] += 1; continue
+                    if comm_c > max_time: audit["Horizon"] += 1; continue
                     
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
-                        m_list = b.get('markets', [])
-                        if not m_list: continue
-                        mkts = m_list[0].get('outcomes', [])
+                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
                         for o in mkts:
                             v = o.get('point') if mkt == 'spreads' else o.get('price')
                             if o['name'] == game['away_team']:
@@ -168,23 +148,11 @@ with tab1:
                                 if b['key'] == 'fanduel': fd_h = v
                                 elif b['key'] == 'pinnacle': pin_h = v
                     
-                    if fd_a is None or fd_h is None: continue 
-                    
-                    # 3. PINNACLE GATE: (Bypass if Intel Only)
-                    if not mode_is_intel and (pin_a is None or pin_h is None):
-                        audit["NoLines"] += 1; continue
-                    
-                    edge_a, edge_h = 0.0, 0.0
-                    if pin_a is not None and pin_h is not None:
-                        edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
-                        if is_ml: edge_a, edge_h = edge_a * 100, edge_h * 100
-                    
-                    if mode_is_intel: show_game = True
-                    else:
-                        floor = (min_ml_edge if is_ml else min_pt_edge) - 0.01
-                        show_game = edge_a >= floor or edge_h >= floor
-                    
-                    if show_game:
+                    if any(v is None for v in [fd_a, pin_a, fd_h, pin_h]): audit["NoLines"] += 1; continue
+                    edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
+                    if mkt == 'h2h': edge_a, edge_h = edge_a * 100, edge_h * 100
+                    floor = (min_ml_edge if mkt == 'h2h' else min_pt_edge) - 0.01
+                    if edge_a >= floor or edge_h >= floor:
                         audit["Hits"] += 1
                         t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
                         new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%m/%d %I:%M %p')})
@@ -194,44 +162,66 @@ with tab1:
         st.session_state.audit_data = audit
         st.rerun()
 
-    if st.session_state.get("audit_data"):
-        a = st.session_state.audit_data
-        with st.container(border=True):
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Scanned Matchups", a['Total'])
-            c2.metric("Visible Hits", a['Hits'])
-            c3.metric("Filtered Out", a['Total'] - a['Hits'])
-
     for res in st.session_state.scan_results:
         with st.container(border=True):
             price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
             st.subheader(f"{res['Target']} ({price_str})")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             c1, c2 = st.columns(2)
-            edge_val = f"{res['Edge']:.1f}" if res['PIN'] else "N/A"
-            c1.metric("Market Edge", f"{edge_val} {'pts' if res['Market']=='spreads' else 'cents'}")
-            if res['PIN']: c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
-            else: c2.warning("Pinnacle Locked")
-            
+            c1.metric("Market Edge", f"{res['Edge']:.1f} {'pts' if res['Market']=='spreads' else 'cents'}")
+            c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
             ca, cb, cc, cd = st.columns([1, 1, 0.4, 0.5])
-            if ca.button(f"⚡ Quick Intel", key=f"q_{res['Matchup']}", use_container_width=True):
+            if ca.button(f"⚡ Quick Intel", key=f"t1q_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"iq_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key)
-            if cb.button(f"🔎 Detailed Intel", key=f"d_{res['Matchup']}", use_container_width=True):
+            if cb.button(f"🔎 Detailed Intel", key=f"t1d_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key)
-            units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"u_{res['Matchup']}")
-            if cd.button(f"✅ LOG", key=f"l_{res['Matchup']}", type="primary", use_container_width=True):
+            units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"t1u_{res['Matchup']}")
+            if cd.button(f"✅ LOG", key=f"t1l_{res['Matchup']}", type="primary", use_container_width=True):
                 if log_to_github_ledger({"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": units, "Result": "Pending"}):
                     st.toast("Saved!"); time.sleep(0.5); st.rerun()
             if f"iq_{res['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}"])
             if f"id_{res['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}"])
 
+# --- TAB 2: INTEL SCOUT (THE NEW OVERRIDE) ---
 with tab2:
+    st.markdown("### 🧠 Master Scout Board")
+    st.info("This tab bypasses math filters. It shows all upcoming games for the day that haven't started.")
+    if st.button("🚀 REFRESH ALL UPCOMING GAMES", use_container_width=True):
+        all_intel = []; now_c = datetime.now(pytz.timezone('US/Central'))
+        for name in selected_leagues:
+            s_key, mkt = l_map[name]
+            try:
+                data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us", "markets": mkt}).json()
+                for game in data:
+                    comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
+                    if comm_c < now_c: continue # ONLY filter out games that started
+                    fd_a, pin_a = None, None
+                    for b in game.get('bookmakers', []):
+                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
+                        for o in mkts:
+                            if o['name'] == game['away_team']:
+                                if b['key'] == 'fanduel': fd_a = o.get('point') if mkt == 'spreads' else o.get('price')
+                                if b['key'] == 'pinnacle': pin_a = o.get('point') if mkt == 'spreads' else o.get('price')
+                    all_intel.append({"Matchup": f"{game['away_team']} @ {game['home_team']}", "Target": game['away_team'], "FD": fd_a, "PIN": pin_a, "Sport": name, "Market": mkt, "Start": comm_c.strftime('%I:%M %p')})
+            except: continue
+        st.session_state.intel_results = all_intel; st.rerun()
+
+    for game in st.session_state.intel_results:
+        with st.container(border=True):
+            st.subheader(game['Matchup'])
+            st.caption(f"🕒 Starts at {game['Start']} | {game['Sport']}")
+            c1, c2 = st.columns(2)
+            if ca := c1.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}", use_container_width=True):
+                st.session_state[f"iq_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Market'], game['Target'], game['FD'], game['PIN'], 0.0, gemini_key)
+            if cb := c2.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}", use_container_width=True):
+                st.session_state[f"id_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Market'], game['Target'], game['FD'], game['PIN'], 0.0, gemini_key)
+            if f"iq_{game['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{game['Matchup']}"])
+            if f"id_{game['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}"])
+
+# --- TAB 3: PERFORMANCE LEDGER ---
+with tab3:
     st.header("📈 Performance Ledger")
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
-        with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
-            edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
-            if st.button("💾 SAVE MANUAL GRADES"):
-                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
         display_df = df.iloc[::-1].copy(); display_df.index = range(1, len(display_df) + 1)
         st.dataframe(display_df, use_container_width=True)
