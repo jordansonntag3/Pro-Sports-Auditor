@@ -1,41 +1,59 @@
 Team,Opening_Line,Recorded_At,Sport
-Atlanta Hawks,-4.5,2026-04-01 10:36:30,basketball_nba
-Orlando Magic,4.5,2026-04-01 10:36:30,basketball_nba
-Philadelphia 76ers,-16.0,2026-04-01 10:36:30,basketball_nba
-Washington Wizards,16.0,2026-04-01 10:36:30,basketball_nba
-Boston Celtics,-5.5,2026-04-01 10:36:30,basketball_nba
-Miami Heat,5.5,2026-04-01 10:36:30,basketball_nba
-Houston Rockets,-17.0,2026-04-01 10:36:30,basketball_nba
-Milwaukee Bucks,17.0,2026-04-01 10:36:30,basketball_nba
-Memphis Grizzlies,14.5,2026-04-01 10:36:30,basketball_nba
-New York Knicks,-14.5,2026-04-01 10:36:30,basketball_nba
-Sacramento Kings,13.5,2026-04-01 10:36:30,basketball_nba
-Toronto Raptors,-13.5,2026-04-01 10:36:30,basketball_nba
-Chicago Bulls,-5.0,2026-04-01 10:36:30,basketball_nba
-Indiana Pacers,5.0,2026-04-01 10:36:30,basketball_nba
-Denver Nuggets,-17.0,2026-04-01 10:36:30,basketball_nba
-Utah Jazz,17.0,2026-04-01 10:36:30,basketball_nba
-Golden State Warriors,13.5,2026-04-01 10:36:30,basketball_nba
-San Antonio Spurs,-13.5,2026-04-01 10:36:30,basketball_nba
-New Mexico Lobos,-4.5,2026-04-01 10:36:30,basketball_ncaab
-Tulsa Golden Hurricane,4.5,2026-04-01 10:36:30,basketball_ncaab
-Auburn Tigers,-6.5,2026-04-01 10:36:30,basketball_ncaab
-Illinois St Redbirds,6.5,2026-04-01 10:36:30,basketball_ncaab
-Illinois Fighting Illini,-2.5,2026-04-01 10:36:30,basketball_ncaab
-UConn Huskies,2.5,2026-04-01 10:36:30,basketball_ncaab
-Arizona Wildcats,1.5,2026-04-01 10:36:30,basketball_ncaab
-Michigan Wolverines,-1.5,2026-04-01 10:36:30,basketball_ncaab
-Arizona Wildcats,-4.5,2026-04-01 10:36:30,basketball_ncaab
-Illinois Fighting Illini,4.5,2026-04-01 10:36:30,basketball_ncaab
-Arizona Wildcats,-5.5,2026-04-01 10:36:30,basketball_ncaab
-UConn Huskies,5.5,2026-04-01 10:36:30,basketball_ncaab
-Illinois Fighting Illini,5.5,2026-04-01 10:36:30,basketball_ncaab
-Michigan Wolverines,-5.5,2026-04-01 10:36:30,basketball_ncaab
-Michigan Wolverines,-6.5,2026-04-01 10:36:30,basketball_ncaab
-UConn Huskies,6.5,2026-04-01 10:36:30,basketball_ncaab
-Colorado Avalanche,1.2,2026-04-01 10:36:30,icehockey_nhl
-Vancouver Canucks,4.65,2026-04-01 10:36:30,icehockey_nhl
-Anaheim Ducks,1.88,2026-04-01 10:36:30,icehockey_nhl
-San Jose Sharks,1.94,2026-04-01 10:36:30,icehockey_nhl
-Los Angeles Kings,1.7,2026-04-01 10:36:30,icehockey_nhl
-St Louis Blues,2.18,2026-04-01 10:36:30,icehockey_nhl
+Charlotte Hornets,-5.5,2026-04-02 10:14:18,basketball_nba
+Phoenix Suns,5.5,2026-04-02 10:14:18,basketball_nba
+Detroit Pistons,-3.5,2026-04-02 10:14:18,basketball_nba
+Minnesota Timberwolves,3.5,2026-04-02 10:14:18,basketball_nba
+Los Angeles Lakers,9.0,2026-04-02 10:14:18,basketball_nba
+Oklahoma City Thunder,-9.0,2026-04-02 10:14:18,basketball_nba
+Cleveland Cavaliers,-10.5,2026-04-02 10:14:18,basketball_nba
+Golden State Warriors,10.5,2026-04-02 10:14:18,basketball_nba
+New Orleans Pelicans,6.5,2026-04-02 10:14:18,basketball_nba
+Portland Trail Blazers,-6.5,2026-04-02 10:14:18,basketball_nba
+Los Angeles Clippers,4.5,2026-04-02 10:14:18,basketball_nba
+San Antonio Spurs,-4.5,2026-04-02 10:14:18,basketball_nba
+New Mexico Lobos,-3.5,2026-04-02 10:14:18,basketball_ncaab
+Tulsa Golden Hurricane,3.5,2026-04-02 10:14:18,basketball_ncaab
+Stanford Cardinal,-1.5,2026-04-02 10:14:18,basketball_ncaab
+West Virginia Mountaineers,1.5,2026-04-02 10:14:18,basketball_ncaab
+Auburn Tigers,-6.5,2026-04-02 10:14:18,basketball_ncaab
+Illinois St Redbirds,6.5,2026-04-02 10:14:18,basketball_ncaab
+Illinois Fighting Illini,-2.5,2026-04-02 10:14:18,basketball_ncaab
+UConn Huskies,2.5,2026-04-02 10:14:18,basketball_ncaab
+Arizona Wildcats,1.5,2026-04-02 10:14:18,basketball_ncaab
+Michigan Wolverines,-1.5,2026-04-02 10:14:18,basketball_ncaab
+Arizona Wildcats,-4.5,2026-04-02 10:14:18,basketball_ncaab
+Illinois Fighting Illini,4.5,2026-04-02 10:14:18,basketball_ncaab
+Arizona Wildcats,-5.5,2026-04-02 10:14:18,basketball_ncaab
+UConn Huskies,5.5,2026-04-02 10:14:18,basketball_ncaab
+Illinois Fighting Illini,4.5,2026-04-02 10:14:18,basketball_ncaab
+Michigan Wolverines,-4.5,2026-04-02 10:14:18,basketball_ncaab
+Michigan Wolverines,-6.5,2026-04-02 10:14:18,basketball_ncaab
+UConn Huskies,6.5,2026-04-02 10:14:18,basketball_ncaab
+Boston Bruins,1.65,2026-04-02 10:14:18,icehockey_nhl
+Florida Panthers,2.28,2026-04-02 10:14:18,icehockey_nhl
+Buffalo Sabres,1.98,2026-04-02 10:14:18,icehockey_nhl
+Ottawa Senators,1.85,2026-04-02 10:14:18,icehockey_nhl
+Carolina Hurricanes,1.54,2026-04-02 10:14:18,icehockey_nhl
+Columbus Blue Jackets,2.52,2026-04-02 10:14:18,icehockey_nhl
+Detroit Red Wings,1.95,2026-04-02 10:14:18,icehockey_nhl
+Philadelphia Flyers,1.88,2026-04-02 10:14:18,icehockey_nhl
+Montréal Canadiens,1.64,2026-04-02 10:14:18,icehockey_nhl
+New York Rangers,2.3,2026-04-02 10:14:18,icehockey_nhl
+Pittsburgh Penguins,2.46,2026-04-02 10:14:18,icehockey_nhl
+Tampa Bay Lightning,1.57,2026-04-02 10:14:18,icehockey_nhl
+New Jersey Devils,1.85,2026-04-02 10:14:18,icehockey_nhl
+Washington Capitals,1.98,2026-04-02 10:14:18,icehockey_nhl
+Dallas Stars,1.59,2026-04-02 10:14:18,icehockey_nhl
+Winnipeg Jets,2.4,2026-04-02 10:14:18,icehockey_nhl
+Minnesota Wild,1.24,2026-04-02 10:14:18,icehockey_nhl
+Vancouver Canucks,4.2,2026-04-02 10:14:18,icehockey_nhl
+Chicago Blackhawks,2.98,2026-04-02 10:14:18,icehockey_nhl
+Edmonton Oilers,1.41,2026-04-02 10:14:18,icehockey_nhl
+Calgary Flames,2.98,2026-04-02 10:14:18,icehockey_nhl
+Vegas Golden Knights,1.4,2026-04-02 10:14:18,icehockey_nhl
+San Jose Sharks,1.83,2026-04-02 10:14:18,icehockey_nhl
+Toronto Maple Leafs,2.0,2026-04-02 10:14:18,icehockey_nhl
+Seattle Kraken,2.1,2026-04-02 10:14:18,icehockey_nhl
+Utah Mammoth,1.76,2026-04-02 10:14:18,icehockey_nhl
+Los Angeles Kings,1.8,2026-04-02 10:14:18,icehockey_nhl
+Nashville Predators,2.04,2026-04-02 10:14:18,icehockey_nhl
