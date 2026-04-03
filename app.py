@@ -6,6 +6,7 @@ import time
 import base64
 from io import StringIO
 import pytz
+import urllib.parse
 
 # 1. Page Configuration
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
@@ -53,6 +54,20 @@ def to_american(decimal):
         else: return f"{int(-100 / (val - 1))}"
     except: return str(decimal)
 
+def make_gemini_link(matchup, sport, target, price, edge):
+    """Generates a deep link to Gemini with a pre-filled Live Search prompt."""
+    edge_label = "cents" if "NHL" in sport else "points"
+    prompt = (
+        f"Act as a Professional Sports Scout and Betting Analyst. Using Google Search, "
+        f"find the latest injury reports, roster changes, and schedule fatigue for the {matchup} ({sport}). "
+        f"Analyze the value of betting on {target} at {price} given a {edge:.1f} {edge_label} edge "
+        f"over the sharp market at Pinnacle. Provide a structured breakdown including: "
+        f"PROS (The bull case), CONS (The bear case), THE CASE (Situational analysis), "
+        f"and a final VERDICT (🟢 PLAY, 🟡 WAIT, or 🛑 PASS)."
+    )
+    encoded_prompt = urllib.parse.quote(prompt)
+    return f"https://gemini.google.com/app?prompt={encoded_prompt}"
+
 def log_to_github_ledger(new_data, overwrite_df=None):
     repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
@@ -82,15 +97,7 @@ if time.time() - st.session_state.last_sync > 60: sync_ledger()
 def get_master_intel(matchup, sport, market_type, target_team, fd_p, pin_p, edge, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     pin_context = f"vs Pinnacle {pin_p}" if pin_p else "(Pinnacle Locked/Missing)"
-    prompt = f"""
-    ROLE: Professional Betting Analyst & Scout.
-    GAME: {matchup} ({sport}) | TARGET: {target_team} {fd_p} {pin_context}.
-    STRUCTURE:
-    - **PROS**: The bull case for this bet.
-    - **CONS**: The bear case/risks.
-    - **THE CASE**: Balanced analysis of the matchup context.
-    - **VERDICT**: Final bold verdict (🟢 PLAY, 🟡 WAIT, or 🛑 PASS).
-    """
+    prompt = f"Expert Scout report for {matchup} ({sport}) target {target_team} {fd_p} {pin_context}."
     payload = {"contents": [{"parts": [{"text": prompt}]}], "safetySettings": [{"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}]}
     if grounding_mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.5)
     try:
@@ -120,8 +127,10 @@ with tab1:
             if st.session_state[f"active_{league}"]: selected_leagues.append(league)
 
     if st.button("🚀 RUN MATH SCAN", use_container_width=True):
-        new_res = []; audit = {"Total": 0, "Started": 0, "Horizon": 0, "NoLines": 0, "Efficient": 0, "Hits": 0}
+        new_res = []; discord_msg_list = []; audit = {"Total": 0, "Started": 0, "Horizon": 0, "NoLines": 0, "Efficient": 0, "Hits": 0}
         now_central = datetime.now(pytz.timezone('US/Central'))
+        today_str = datetime.now(pytz.timezone('US/Central')).strftime("%Y-%m-%d")
+        
         if horizon == "Today": max_time = now_central.replace(hour=23, minute=59)
         elif horizon == "Tomorrow": max_time = (now_central + timedelta(days=1)).replace(hour=23, minute=59)
         else: max_time = now_central + timedelta(hours=48)
@@ -138,7 +147,9 @@ with tab1:
                     
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
-                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
+                        m_list = b.get('markets', [])
+                        if not m_list: continue
+                        mkts = m_list[0].get('outcomes', [])
                         for o in mkts:
                             v = o.get('point') if mkt == 'spreads' else o.get('price')
                             if o['name'] == game['away_team']:
@@ -152,17 +163,39 @@ with tab1:
                     edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
                     if mkt == 'h2h': edge_a, edge_h = edge_a * 100, edge_h * 100
                     floor = (min_ml_edge if mkt == 'h2h' else min_pt_edge) - 0.01
+                    
                     if edge_a >= floor or edge_h >= floor:
                         audit["Hits"] += 1
                         t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
-                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%m/%d %I:%M %p')})
+                        matchup_str = f"{game['away_team']} @ {game['home_team']}"
+                        
+                        # --- DISCORD ALERT LOGIC ---
+                        alert_fp = f"{t_team}_{today_str}"
+                        if discord_live_url and alert_fp not in st.session_state.sent_alerts:
+                            emoji = "🏒" if name == "NHL" else "🏀" if "NBA" in name or "NCAA B" in name else "🏈"
+                            line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
+                            scout_url = make_gemini_link(matchup_str, name, t_team, line_str, edge)
+                            discord_msg_list.append(
+                                f"{emoji} **{name} | {t_team} ({line_str})**\n"
+                                f"* Matchup: {matchup_str}\n"
+                                f"* Market Edge: {edge:.1f} {'cents' if mkt=='h2h' else 'pts'} vs Pinnacle\n"
+                                f"[🔎 **OPEN DETAILED SCOUTING REPORT**]({scout_url})\n"
+                            )
+                            st.session_state.sent_alerts.add(alert_fp)
+                        
+                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": matchup_str, "Start": comm_c.strftime('%m/%d %I:%M %p')})
                     else: audit["Efficient"] += 1
             except: continue
+        
+        # PUSH TO DISCORD
+        if discord_msg_list:
+            final_msg = "**💥 BANG! Button Live Value Feed**\n***\n" + "\n".join(discord_msg_list) + "\n***"
+            requests.post(discord_live_url, json={"content": final_msg})
+            
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
         st.session_state.audit_data = audit
         st.rerun()
 
-    # RESTORED: THE AUDIT DISPLAY UI
     if st.session_state.get("audit_data"):
         a = st.session_state.audit_data
         with st.container(border=True):
@@ -170,8 +203,6 @@ with tab1:
             c1.metric("Total Scanned", a['Total'])
             c2.metric("Value Hits", a['Hits'])
             c3.metric("Discarded", a['Total'] - a['Hits'])
-            with st.expander("🔍 Discard Breakdown"):
-                st.write(f"- {a['Started']} Started | {a['Horizon']} Outside Horizon | {a['NoLines']} Missing Lines | {a['Efficient']} Efficient/No Edge")
 
     for res in st.session_state.scan_results:
         with st.container(border=True):
@@ -234,15 +265,7 @@ with tab2:
 # --- TAB 3: PERFORMANCE LEDGER ---
 with tab3:
     st.header("📈 Performance Ledger")
-    col_a, col_b = st.columns(2)
-    if col_a.button("🔄 REFRESH FROM GITHUB", use_container_width=True):
-        if sync_ledger(): st.toast("Synced!")
-        st.rerun()
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
-        with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
-            edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
-            if st.button("💾 SAVE MANUAL GRADES"):
-                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
         display_df = df.iloc[::-1].copy(); display_df.index = range(1, len(display_df) + 1)
         st.dataframe(display_df, use_container_width=True)
