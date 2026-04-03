@@ -55,23 +55,15 @@ def to_american(decimal):
     except: return str(decimal)
 
 def make_gemini_link(matchup, sport, target, price, edge):
-    """Generates a shortened TinyURL link to Gemini with a pre-filled prompt."""
-    edge_label = "cents" if "NHL" in sport else "points"
+    """Generates a direct, URL-safe deep link to Gemini."""
     prompt = (
         f"Using Google Search, find the latest injury reports and fatigue for {matchup} ({sport}). "
-        f"Analyze betting on {target} at {price} with a {edge:.1f} {edge_label} edge "
-        f"over the sharp market. Provide: PROS, CONS, THE CASE, and VERDICT (🟢 PLAY, 🟡 WAIT, or 🛑 PASS)."
+        f"Analyze betting on {target} at {price} with a {edge:.1f} edge vs sharp market. "
+        f"Provide: PROS, CONS, THE CASE, and VERDICT (🟢 PLAY, 🟡 WAIT, or 🛑 PASS)."
     )
-    # Using 'q' instead of 'prompt' for better Gemini web app compatibility
-    encoded_prompt = urllib.parse.quote(prompt)
-    long_url = f"https://gemini.google.com/app?q={encoded_prompt}"
-    
-    # Call TinyURL API to shorten the massive link
-    try:
-        r = requests.get(f"http://tinyurl.com/api-create.php?url={long_url}", timeout=5)
-        return r.text if r.status_code == 200 else long_url
-    except:
-        return long_url
+    # quote_plus turns spaces into '+' which Gemini's 'q' parameter prefers
+    encoded_prompt = urllib.parse.quote_plus(prompt)
+    return f"https://gemini.google.com/app?q={encoded_prompt}"
 
 def log_to_github_ledger(new_data, overwrite_df=None):
     repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
@@ -182,8 +174,8 @@ with tab1:
                             discord_msg_list.append(
                                 f"{emoji} **{name} | {t_team} ({line_str})**\n"
                                 f"* Matchup: {matchup_str}\n"
-                                f"* Market Edge: {edge:.1f} {'cents' if mkt=='h2h' else 'pts'} vs Pinnacle\n"
-                                f"[🔎 **OPEN DETAILED SCOUTING REPORT**]({scout_url})\n"
+                                f"* Edge: {edge:.1f} {'cents' if mkt=='h2h' else 'pts'}\n"
+                                f"[🔎 **DETAILED INTEL**]({scout_url})"
                             )
                             st.session_state.sent_alerts.add(alert_fp)
                         
@@ -221,7 +213,7 @@ with tab1:
             if cb.button(f"🔎 Detailed Intel", key=f"t1d_{res['Matchup']}", use_container_width=True):
                 st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Market'], res['Target'], res['FD'], res['PIN'], res['Edge'], gemini_key)
             units = cc.number_input("Units", 0.1, 10.0, 1.0, 0.5, key=f"t1u_{res['Matchup']}")
-            if cd.button(f"✅ LOG", key=f"l_{res['Matchup']}", type="primary", use_container_width=True):
+            if cd.button(f"✅ LOG", key=f"t1l_{res['Matchup']}", type="primary", use_container_width=True):
                 if log_to_github_ledger({"Date": datetime.now().strftime("%Y-%m-%d %H:%M"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": units, "Result": "Pending"}):
                     st.toast("Saved!"); time.sleep(0.5); st.rerun()
             if f"iq_{res['Matchup']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}"])
@@ -267,7 +259,15 @@ with tab2:
 # --- TAB 3: PERFORMANCE LEDGER ---
 with tab3:
     st.header("📈 Performance Ledger")
+    col_a, col_b = st.columns(2)
+    if col_a.button("🔄 REFRESH FROM GITHUB", use_container_width=True):
+        if sync_ledger(): st.toast("Synced!")
+        st.rerun()
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
+        with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
+            edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
+            if st.button("💾 SAVE MANUAL GRADES"):
+                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
         display_df = df.iloc[::-1].copy(); display_df.index = range(1, len(display_df) + 1)
         st.dataframe(display_df, use_container_width=True)
