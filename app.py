@@ -11,7 +11,7 @@ import urllib.parse
 # 1. PAGE CONFIGURATION
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
-# 2. SESSION STATE INITIALIZATION (The App's Memory)
+# 2. SESSION STATE INITIALIZATION
 if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "intel_results" not in st.session_state: st.session_state.intel_results = []
@@ -24,7 +24,7 @@ leagues_list = ["NBA", "NHL", "NCAA B", "NFL", "NCAA F"]
 for league in leagues_list:
     if f"active_{league}" not in st.session_state: st.session_state[f"active_{league}"] = True
 
-# 3. SECRETS RETRIEVAL
+# SECRETS
 api_key = st.secrets["ODDS_API_KEY"]
 gemini_key = st.secrets["GEMINI_API_KEY"]
 discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
@@ -41,17 +41,18 @@ def to_american(decimal):
     except: return str(decimal)
 
 def make_gemini_link(matchup, sport, target, price, edge):
-    """Generates a direct, URL-safe deep link to Gemini with Live Search prompt."""
-    prompt = (
-        f"Using Google Search, find the latest injury reports and fatigue for {matchup} ({sport}). "
-        f"Analyze betting on {target} at {price} with a {edge:.1f} edge vs sharp market. "
-        f"Provide: PROS, CONS, THE CASE, and VERDICT (🟢 PLAY, 🟡 WAIT, or 🛑 PASS)."
+    """Generates a Google Search link to trigger an AI Overview (Gemini)."""
+    query = (
+        f"Detailed scouting report for {matchup} {sport}. "
+        f"Analyze injuries and schedule fatigue for {target} at {price}. "
+        f"Is this a 🟢 PLAY, 🟡 WAIT, or 🛑 PASS?"
     )
-    encoded_prompt = urllib.parse.quote_plus(prompt)
-    return f"https://gemini.google.com/app?q={encoded_prompt}"
+    # quote() handles parentheses better than quote_plus() for Discord Markdown
+    encoded_query = urllib.parse.quote(query)
+    return f"https://www.google.com/search?q={encoded_query}"
 
 def log_to_github_ledger(new_data=None, overwrite_df=None):
-    """Universal GitHub Sync: Handles both new bets and full status overwrites."""
+    """Saves data to GitHub. Handles both single appends and full table overwrites."""
     repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
@@ -75,7 +76,7 @@ def log_to_github_ledger(new_data=None, overwrite_df=None):
     return False
 
 def sync_ledger():
-    """Pulls current ledger from GitHub to local session state."""
+    """Pulls current ledger from GitHub into the app."""
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
         df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
@@ -86,7 +87,7 @@ def sync_ledger():
     except: return False
 
 def auto_grade_ledger():
-    """The Settlement Engine: Fetches scores and calculates Win/Loss/Push."""
+    """Automatically settles Win/Loss/Push based on live scores and handicaps."""
     if not st.session_state.bet_history: return False
     df = pd.DataFrame(st.session_state.bet_history)
     pending_bets = df[df['Result'] == 'Pending']
@@ -101,18 +102,21 @@ def auto_grade_ledger():
         try:
             scores = requests.get(f"https://api.the-odds-api.com/v4/sports/{sport_key}/scores/?apiKey={api_key}&daysFrom=3").json()
             for game in scores:
-                # Partial name matching (e.g., 'Auburn' in 'Auburn Tigers')
-                if (row['Team'] in game['home_team'] or row['Team'] in game['away_team']) and game.get('completed'):
+                # REFINED MATCHING: Checks for team name overlap (e.g. 'Auburn' in 'Auburn Tigers')
+                game_teams = [game['home_team'].lower(), game['away_team'].lower()]
+                target_team = row['Team'].lower()
+                
+                if any(target_team in t for t in game_teams) and game.get('completed'):
                     h_score = next((s['score'] for s in game['scores'] if s['name'] == game['home_team']), 0)
                     a_score = next((s['score'] for s in game['scores'] if s['name'] == game['away_team']), 0)
-                    target_s = h_score if row['Team'] == game['home_team'] else a_score
-                    opp_s = a_score if row['Team'] == game['home_team'] else h_score
                     
-                    # Grade Logic
-                    line_str = str(row['Line']).replace('+', '')
-                    line_val = float(line_str)
+                    is_home = target_team in game['home_team'].lower()
+                    target_s = h_score if is_home else a_score
+                    opp_s = a_score if is_home else h_score
                     
-                    # (Target + Handicap) vs Opponent
+                    # SPREAD MATH: Strips '+' and converts to float
+                    line_val = float(str(row['Line']).replace('+', ''))
+                    
                     if (target_s + line_val) > opp_s: df.at[idx, 'Result'] = "Win"
                     elif (target_s + line_val) < opp_s: df.at[idx, 'Result'] = "Loss"
                     else: df.at[idx, 'Result'] = "Push"
@@ -126,10 +130,10 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, mkt, target, fd_p, pin_p, edge, _key):
-    """The internal AI scout for on-app analysis."""
+    """On-app AI analysis."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
-    pin_ctx = f"vs Pinnacle {pin_p}" if pin_p else "(Pinnacle Locked)"
-    prompt = f"Professional Scout Report: {matchup} ({sport}) Target {target} {fd_p} {pin_ctx}. Provide PROS, CONS, VERDICT."
+    pin_ctx = f"vs Pinnacle {pin_p}" if pin_p else "(Locked)"
+    prompt = f"Expert Scout: {matchup} ({sport}) Target {target} {fd_p} {pin_ctx}. Provide PROS, CONS, VERDICT."
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     if grounding_mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.2)
     try:
@@ -146,8 +150,6 @@ with st.sidebar:
         for key in list(st.session_state.keys()):
             if key not in ["sent_alerts", "bet_history"]: del st.session_state[key]
         st.rerun()
-    st.divider()
-    st.markdown("**Vibe Guide:** 🚀 Velocity | ⚓ Stable | 🌊 Drift")
 
 if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
@@ -190,9 +192,7 @@ with tab1:
                     
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
-                        m_list = b.get('markets', [])
-                        if not m_list: continue
-                        mkts = m_list[0].get('outcomes', [])
+                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
                         for o in mkts:
                             v = o.get('point') if mkt == 'spreads' else o.get('price')
                             if o['name'] == game['away_team']:
@@ -212,7 +212,6 @@ with tab1:
                         t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
                         matchup_str = f"{game['away_team']} @ {game['home_team']}"
                         
-                        # Discord Alert
                         alert_fp = f"{t_team}_{today_str}"
                         if discord_live_url and alert_fp not in st.session_state.sent_alerts:
                             emoji = "🏒" if name == "NHL" else "🏀" if "NBA" in name or "NCAA B" in name else "🏈"
@@ -275,7 +274,7 @@ with tab2:
 
     for game in st.session_state.intel_results:
         with st.container(border=True):
-            st.subheader(game['Matchup']); st.caption(f"🕒 Starts at {game['Start']} | {game['Sport']}")
+            st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
             c1, c2 = st.columns(2)
             if c1.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}"): st.session_state[f"iq_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Market'], game['Target'], game['FD'], game['PIN'], 0.0, gemini_key)
             if c2.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}"): st.session_state[f"id_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Market'], game['Target'], game['FD'], game['PIN'], 0.0, gemini_key)
@@ -289,7 +288,7 @@ with tab3:
     if c1.button("🔄 AUTO-SETTLE PENDING BETS", use_container_width=True, type="primary"):
         with st.spinner("Auditing scores..."):
             if auto_grade_ledger(): st.success("Updated!"); st.rerun()
-            else: st.info("No new results yet.")
+            else: st.info("No new game results found.")
     if c2.button("🔄 REFRESH FROM GITHUB", use_container_width=True):
         if sync_ledger(): st.rerun()
 
