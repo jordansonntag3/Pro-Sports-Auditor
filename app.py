@@ -39,7 +39,6 @@ def to_american(decimal):
     except: return str(decimal)
 
 def make_scout_link(matchup, sport):
-    """The Discord Link: Keyword-optimized search for rotation/fatigue news."""
     query = f"Analyze {matchup} {sport} injuries rotation impact schedule fatigue rest days"
     encoded_query = urllib.parse.quote(query)
     return f"https://www.google.com/search?q={encoded_query}"
@@ -116,7 +115,6 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    """The Perfect Scout: Numerical breakdown Jordan liked (PPP, Splits, Efficiency)."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     if type == "detailed":
@@ -139,7 +137,7 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
         return res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
     except: return "⚠️ Intel Timeout."
 
-# --- SIDEBAR (RESTORED) ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
@@ -222,20 +220,20 @@ with tab1:
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
         st.session_state.audit_data = audit; st.rerun()
 
-    for res in st.session_state.scan_results:
+    for i, res in enumerate(st.session_state.scan_results):
         with st.container(border=True):
             price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
             st.subheader(f"{res['Target']} ({price_str})")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
             ca, cb = st.columns(2)
-            if ca.button(f"⚡ Quick Intel", key=f"t1q_{res['Matchup']}_{res['Sport']}", use_container_width=True):
-                st.session_state[f"iq_{res['Matchup']}_{res['Sport']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="quick")
-            if cb.button(f"🔎 Detailed Intel", key=f"t1d_{res['Matchup']}_{res['Sport']}", use_container_width=True):
-                st.session_state[f"id_{res['Matchup']}_{res['Sport']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="detailed")
-            if f"iq_{res['Matchup']}_{res['Sport']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}_{res['Sport']}"])
-            if f"id_{res['Matchup']}_{res['Sport']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{res['Sport']}"])
-            if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{res['Sport']}", type="primary", use_container_width=True):
+            if ca.button(f"⚡ Quick Intel", key=f"t1q_{res['Matchup']}_{i}", use_container_width=True):
+                st.session_state[f"iq_{res['Matchup']}_{i}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="quick")
+            if cb.button(f"🔎 Detailed Intel", key=f"t1d_{res['Matchup']}_{i}", use_container_width=True):
+                st.session_state[f"id_{res['Matchup']}_{i}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="detailed")
+            if f"iq_{res['Matchup']}_{i}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}_{i}"])
+            if f"id_{res['Matchup']}_{i}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{i}"])
+            if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{i}", type="primary", use_container_width=True):
                 log_to_github_ledger({"Date": datetime.now().strftime("%m/%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
                 st.toast("Logged!"); st.rerun()
 
@@ -254,16 +252,16 @@ with tab2:
             except: continue
         st.session_state.intel_results = all_intel; st.rerun()
 
-    for game in st.session_state.intel_results:
+    for i, game in enumerate(st.session_state.intel_results):
         with st.container(border=True):
             st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
             qa, qb = st.columns(2)
-            if qa.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}_{game['Sport']}", use_container_width=True):
-                st.session_state[f"iq_{game['Matchup']}_{game['Sport']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="quick")
-            if qb.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}_{game['Sport']}", use_container_width=True):
-                st.session_state[f"id_{game['Matchup']}_{game['Sport']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="detailed")
-            if f"iq_{game['Matchup']}_{game['Sport']}" in st.session_state: st.info(st.session_state[f"iq_{game['Matchup']}_{game['Sport']}"])
-            if f"id_{game['Matchup']}_{game['Sport']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}_{game['Sport']}"])
+            if qa.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}_{game['Sport']}_{i}", use_container_width=True):
+                st.session_state[f"iq_{game['Matchup']}_{game['Sport']}_{i}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="quick")
+            if qb.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}_{game['Sport']}_{i}", use_container_width=True):
+                st.session_state[f"id_{game['Matchup']}_{game['Sport']}_{i}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="detailed")
+            if f"iq_{game['Matchup']}_{game['Sport']}_{i}" in st.session_state: st.info(st.session_state[f"iq_{game['Matchup']}_{game['Sport']}_{i}"])
+            if f"id_{game['Matchup']}_{game['Sport']}_{i}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}_{game['Sport']}_{i}"])
 
 with tab3:
     st.header("📈 Performance Ledger")
