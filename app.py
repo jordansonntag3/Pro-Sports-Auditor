@@ -12,7 +12,6 @@ import urllib.parse
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
 # 2. SESSION STATE INITIALIZATION
-if "search_ledger" not in st.session_state: st.session_state.search_ledger = {}
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "intel_results" not in st.session_state: st.session_state.intel_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
@@ -33,7 +32,6 @@ github_token = st.secrets.get("GITHUB_TOKEN")
 # --- UTILITIES ---
 
 def to_american(decimal):
-    """Converts decimal odds to American (+/-) format."""
     try:
         val = float(decimal)
         if val >= 2.0: return f"+{int((val - 1) * 100)}"
@@ -41,13 +39,12 @@ def to_american(decimal):
     except: return str(decimal)
 
 def make_scout_link(matchup, sport):
-    """The Discord Link: Keyword-optimized search for rotation/fatigue news."""
+    """The Discord Link: Keyword-optimized to trigger actual news/rosters."""
     query = f"Analyze {matchup} {sport} injuries rotation impact schedule fatigue rest days"
     encoded_query = urllib.parse.quote(query)
     return f"https://www.google.com/search?q={encoded_query}"
 
 def log_to_github_ledger(new_data=None, overwrite_df=None):
-    """Saves data to GitHub. Handles both single appends and full table overwrites."""
     repo = "jordansonntag3/Pro-Sports-Auditor"; path = "bet_ledger.csv"
     url = f"https://api.github.com/repos/{repo}/contents/{path}"
     headers = {"Authorization": f"token {github_token}", "Accept": "application/vnd.github.v3+json"}
@@ -71,7 +68,6 @@ def log_to_github_ledger(new_data=None, overwrite_df=None):
     return False
 
 def sync_ledger():
-    """Pulls current ledger from GitHub into the app memory."""
     LEDGER_URL = "https://raw.githubusercontent.com/jordansonntag3/Pro-Sports-Auditor/main/bet_ledger.csv"
     try:
         df = pd.read_csv(f"{LEDGER_URL}?v={time.time()}")
@@ -82,7 +78,7 @@ def sync_ledger():
     except: return False
 
 def auto_grade_ledger():
-    """Settlement Engine: Handles team name variations and spread math correctly."""
+    """Settles bets: Handles 'Auburn Tigers' vs 'Auburn' and spread math."""
     if not st.session_state.bet_history: return False
     df = pd.DataFrame(st.session_state.bet_history)
     pending_bets = df[df['Result'] == 'Pending']
@@ -97,21 +93,17 @@ def auto_grade_ledger():
         try:
             scores = requests.get(f"https://api.the-odds-api.com/v4/sports/{sport_key}/scores/?apiKey={api_key}&daysFrom=3").json()
             for game in scores:
-                # MATCHING: Checks for team name overlap (e.g. 'Auburn' in 'Auburn Tigers')
                 game_teams = [game['home_team'].lower(), game['away_team'].lower()]
                 target_team = str(row['Team']).lower()
                 
                 if any(target_team in t for t in game_teams) and game.get('completed'):
                     h_score = next((s['score'] for s in game['scores'] if s['name'] == game['home_team']), 0)
                     a_score = next((s['score'] for s in game['scores'] if s['name'] == game['away_team']), 0)
-                    
                     is_home = target_team in game['home_team'].lower()
                     target_s = h_score if is_home else a_score
                     opp_s = a_score if is_home else h_score
                     
-                    # SPREAD MATH: Strips '+' and converts to float
                     line_val = float(str(row['Line']).replace('+', ''))
-                    
                     if (target_s + line_val) > opp_s: df.at[idx, 'Result'] = "Win"
                     elif (target_s + line_val) < opp_s: df.at[idx, 'Result'] = "Loss"
                     else: df.at[idx, 'Result'] = "Push"
@@ -124,62 +116,72 @@ def auto_grade_ledger():
             return True
     return False
 
-def get_master_intel(matchup, sport, target, fd_p, edge, _key):
-    """The High-Fidelity Quantitative Scout: Numerical breakdown Jordan liked."""
+def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode):
+    """The High-Fidelity Internal Scout with On/Off splits and PPP."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
+    
     prompt = (
-        f"Professional Scout: {matchup} ({sport}). Target: {target} at {fd_p} (Edge: {edge:.1f}). "
-        f"Analyze injuries/fatigue and provide QUANTITATIVE results: "
-        f"1. ON/OFF SPLITS: PPP (Points per Possession) impact for missing players. "
-        f"2. REPLACEMENT VALUE: PPP and Efficiency stats for the next man in rotation. "
-        f"3. USAGE RATE: Changes for remaining starters. "
-        f"4. FINAL VERDICT: 🟢 PLAY, 🟡 WAIT, or 🛑 PASS based on these numbers."
+        f"Professional Sports Scout Report: {matchup} ({sport}). Target: {target} at {fd_p} (Edge: {edge:.1f}). "
+        f"Analyze injuries and rotation changes. You MUST provide a QUANTITATIVE breakdown including: "
+        f"1. ON/OFF SPLITS: Points per possession (PPP) and offensive/defensive efficiency impact for missing players. "
+        f"2. REPLACEMENT VALUE: Statistical comparison and PPP for the players taking those rotation minutes. "
+        f"3. USAGE IMPACT: How shots/touches shift to remaining starters. "
+        f"4. VERDICT: 🟢 PLAY, 🟡 WAIT, or 🛑 PASS based on these numerical impacts."
     )
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}]}
+    
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    if mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.2)
+    
     try:
-        time.sleep(1.2)
         res = requests.post(url, json=payload, timeout=30).json()
-        return res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
-    except: return "⚠️ Intel Timeout."
+        return res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data available.')
+    except: return "⚠️ Intel Timeout. Try again."
 
-# --- SIDEBAR & GLOBAL SYNC ---
+# --- SIDEBAR (RESTORED GROUNDING MODE) ---
 with st.sidebar:
     st.header("⚙️ Command Center")
+    grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
+    
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
         for key in list(st.session_state.keys()):
             if key not in ["sent_alerts", "bet_history"]: del st.session_state[key]
         st.rerun()
+    
+    st.divider()
+    st.markdown("**Vibe Guide:** 🚀 Velocity | ⚓ Stable")
 
 if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
-# --- MAIN TABS ---
+# --- MAIN UI ---
 tab1, tab2, tab3 = st.tabs(["🚀 Strategic Scanner", "🧠 Intel Scout", "📊 Performance Ledger"])
 
-# --- TAB 1: MATH SCANNER ---
 with tab1:
     st.markdown("### 🛠️ Scan Settings")
-    col1, col2 = st.columns([1, 1.2])
-    with col1:
+    c1, c2 = st.columns([1, 1.2])
+    with c1:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
-    with col2:
+    with c2:
         st.write("**Leagues:**")
-        c1, c2, c3 = st.columns(3); btn_cols = [c1, c2, c3, c1, c2]; selected_leagues = []
+        c1a, c1b, c1c = st.columns(3); selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
-        for i, league in enumerate(leagues_list):
+        
+        # Grid layout for league buttons
+        for i, (league, (s_key, mkt)) in enumerate(l_map.items()):
             active = st.session_state[f"active_{league}"]
-            if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t1_{league}", use_container_width=True):
-                st.session_state[f"active_{league}"] = not active; st.rerun()
-            if active: selected_leagues.append(league)
+            if st.checkbox(f"{'✅' if active else '⬜'} {league}", value=active, key=f"check_{league}"):
+                selected_leagues.append(league)
+                st.session_state[f"active_{league}"] = True
+            else:
+                st.session_state[f"active_{league}"] = False
 
     if st.button("🚀 RUN MATH SCAN", use_container_width=True):
         new_res = []; discord_msg_list = []; audit = {"Total": 0, "Hits": 0}
         now_c = datetime.now(pytz.timezone('US/Central'))
         today_str = now_c.strftime("%Y-%m-%d")
-        max_time = now_c.replace(hour=23, minute=59) if horizon == "Today" else (now_c + timedelta(days=1)).replace(hour=23, minute=59) if horizon == "Tomorrow" else now_c + timedelta(hours=48)
-
+        
         for name in selected_leagues:
             s_key, mkt = l_map[name]
             try:
@@ -187,7 +189,7 @@ with tab1:
                 for game in data:
                     audit["Total"] += 1
                     comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
-                    if comm_c < now_c or comm_c > max_time: continue
+                    if comm_c < now_c: continue
                     
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
@@ -209,27 +211,21 @@ with tab1:
                     if edge_a >= floor or edge_h >= floor:
                         audit["Hits"] += 1
                         t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
-                        matchup_str = f"{game['away_team']} @ {game['home_team']}"
                         
-                        # Discord Alert
                         alert_fp = f"{t_team}_{today_str}"
                         if discord_live_url and alert_fp not in st.session_state.sent_alerts:
                             line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
-                            scout_url = make_scout_link(matchup_str, name)
-                            discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n* Matchup: {matchup_str}\n[🔎 **SCOUTING**]({scout_url})")
+                            scout_url = make_scout_link(f"{game['away_team']} @ {game['home_team']}", name)
+                            discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n* Matchup: {game['away_team']} @ {game['home_team']}\n[🔎 **SCOUTING**]({scout_url})")
                             st.session_state.sent_alerts.add(alert_fp)
                         
-                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": matchup_str, "Start": comm_c.strftime('%m/%d %I:%M %p')})
+                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%I:%M %p')})
             except: continue
         
         if discord_msg_list:
-            requests.post(discord_live_url, json={"content": "**💥 LIVE VALUE ALERTS**\n" + "\n".join(discord_msg_list)})
+            requests.post(discord_live_url, json={"content": "**💥 LIVE VALUE FEED**\n" + "\n".join(discord_msg_list)})
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
         st.session_state.audit_data = audit; st.rerun()
-
-    if st.session_state.get("audit_data"):
-        a = st.session_state.audit_data
-        st.metric("Value Hits Found", f"{a['Hits']} from {a['Total']} games")
 
     for res in st.session_state.scan_results:
         with st.container(border=True):
@@ -238,13 +234,12 @@ with tab1:
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
             if st.button(f"🔎 GET DETAILED NUMERICAL INTEL", key=f"t1d_{res['Matchup']}", use_container_width=True):
-                st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key)
+                st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode)
             if f"id_{res['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}"])
             if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}", type="primary", use_container_width=True):
                 log_to_github_ledger({"Date": datetime.now().strftime("%m/%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
                 st.toast("Logged!"); st.rerun()
 
-# --- TAB 2: SCOUT BOARD ---
 with tab2:
     st.markdown("### 🧠 Master Scout Board")
     if st.button("🚀 REFRESH ALL UPCOMING GAMES", use_container_width=True):
@@ -264,26 +259,22 @@ with tab2:
         with st.container(border=True):
             st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
             if st.button(f"🔎 SCOUT INTEL", key=f"t2d_{game['Matchup']}", use_container_width=True):
-                st.session_state[f"id_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key)
+                st.session_state[f"id_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode)
             if f"id_{game['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}"])
 
-# --- TAB 3: LEDGER ---
 with tab3:
     st.header("📈 Performance Ledger")
     c1, c2 = st.columns(2)
-    if c1.button("🔄 AUTO-SETTLE", use_container_width=True, type="primary"):
-        with st.spinner("Auditing scores..."):
-            if auto_grade_ledger(): st.success("Updated!"); st.rerun()
+    if c1.button("🔄 AUTO-SETTLE PENDING", use_container_width=True, type="primary"):
+        if auto_grade_ledger(): st.rerun()
     if c2.button("🔄 REFRESH GITHUB", use_container_width=True):
         if sync_ledger(): st.rerun()
-
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
         df.index = range(1, len(df) + 1)
         with st.expander("📝 MANUAL GRADE (Hard Commit)", expanded=False):
-            edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True)
+            edited = st.data_editor(df.iloc[::-1], use_container_width=True)
             if st.button("💾 PUSH TO GITHUB"):
-                # HARD COMMIT: Memory updates first
                 st.session_state.bet_history = edited.iloc[::-1].to_dict('records')
                 if log_to_github_ledger(overwrite_df=edited.iloc[::-1]): st.success("Updated!"); st.rerun()
         st.dataframe(df.iloc[::-1], use_container_width=True)
