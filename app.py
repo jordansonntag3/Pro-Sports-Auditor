@@ -11,7 +11,7 @@ import urllib.parse
 # 1. PAGE CONFIGURATION
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
-# 2. SESSION STATE INITIALIZATION
+# 2. SESSION STATE (The Memory Bank)
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "intel_results" not in st.session_state: st.session_state.intel_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
@@ -39,7 +39,7 @@ def to_american(decimal):
     except: return str(decimal)
 
 def make_scout_link(matchup, sport):
-    """The Discord Link: Keyword-optimized to trigger actual news/rosters."""
+    """The Discord Link: Keyword-optimized search for rotation/fatigue news."""
     query = f"Analyze {matchup} {sport} injuries rotation impact schedule fatigue rest days"
     encoded_query = urllib.parse.quote(query)
     return f"https://www.google.com/search?q={encoded_query}"
@@ -78,7 +78,6 @@ def sync_ledger():
     except: return False
 
 def auto_grade_ledger():
-    """Settles bets: Handles 'Auburn Tigers' vs 'Auburn' and spread math."""
     if not st.session_state.bet_history: return False
     df = pd.DataFrame(st.session_state.bet_history)
     pending_bets = df[df['Result'] == 'Pending']
@@ -117,7 +116,7 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode):
-    """The High-Fidelity Internal Scout with On/Off splits and PPP."""
+    """The Quantitative Scout Prompt Jordan liked (PPP, Splits, Efficiency)."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
     prompt = (
@@ -137,7 +136,7 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode):
         return res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data available.')
     except: return "⚠️ Intel Timeout. Try again."
 
-# --- SIDEBAR (RESTORED GROUNDING MODE) ---
+# --- SIDEBAR (RESTORED) ---
 with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
@@ -147,9 +146,6 @@ with st.sidebar:
         for key in list(st.session_state.keys()):
             if key not in ["sent_alerts", "bet_history"]: del st.session_state[key]
         st.rerun()
-    
-    st.divider()
-    st.markdown("**Vibe Guide:** 🚀 Velocity | ⚓ Stable")
 
 if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
@@ -165,13 +161,15 @@ with tab1:
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
     with c2:
         st.write("**Leagues:**")
-        c1a, c1b, c1c = st.columns(3); selected_leagues = []
+        selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
         
-        # Grid layout for league buttons
+        # Restoration of the button-style checkbox grid
+        c1a, c1b, c1c = st.columns(3)
+        cols = [c1a, c1b, c1c, c1a, c1b]
         for i, (league, (s_key, mkt)) in enumerate(l_map.items()):
-            active = st.session_state[f"active_{league}"]
-            if st.checkbox(f"{'✅' if active else '⬜'} {league}", value=active, key=f"check_{league}"):
+            active = st.session_state.get(f"active_{league}", True)
+            if cols[i].checkbox(f"{league}", value=active, key=f"cb_{league}"):
                 selected_leagues.append(league)
                 st.session_state[f"active_{league}"] = True
             else:
@@ -233,10 +231,10 @@ with tab1:
             st.subheader(f"{res['Target']} ({price_str})")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
-            if st.button(f"🔎 GET DETAILED NUMERICAL INTEL", key=f"t1d_{res['Matchup']}", use_container_width=True):
-                st.session_state[f"id_{res['Matchup']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode)
-            if f"id_{res['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}"])
-            if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}", type="primary", use_container_width=True):
+            if st.button(f"🔎 GET NUMERICAL INTEL", key=f"t1d_{res['Matchup']}_{res['Sport']}", use_container_width=True):
+                st.session_state[f"id_{res['Matchup']}_{res['Sport']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode)
+            if f"id_{res['Matchup']}_{res['Sport']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{res['Sport']}"])
+            if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{res['Sport']}", type="primary", use_container_width=True):
                 log_to_github_ledger({"Date": datetime.now().strftime("%m/%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
                 st.toast("Logged!"); st.rerun()
 
@@ -258,9 +256,10 @@ with tab2:
     for game in st.session_state.intel_results:
         with st.container(border=True):
             st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
-            if st.button(f"🔎 SCOUT INTEL", key=f"t2d_{game['Matchup']}", use_container_width=True):
-                st.session_state[f"id_{game['Matchup']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode)
-            if f"id_{game['Matchup']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}"])
+            # Fixed Key: matchup name + sport prevents DuplicateElementKey errors
+            if st.button(f"🔎 SCOUT INTEL", key=f"t2d_{game['Matchup']}_{game['Sport']}", use_container_width=True):
+                st.session_state[f"id_{game['Matchup']}_{game['Sport']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode)
+            if f"id_{game['Matchup']}_{game['Sport']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}_{game['Sport']}"])
 
 with tab3:
     st.header("📈 Performance Ledger")
