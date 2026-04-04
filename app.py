@@ -11,7 +11,7 @@ import urllib.parse
 # 1. PAGE CONFIGURATION
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
-# 2. SESSION STATE (The Memory Bank)
+# 2. SESSION STATE INITIALIZATION
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "intel_results" not in st.session_state: st.session_state.intel_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
@@ -115,32 +115,34 @@ def auto_grade_ledger():
             return True
     return False
 
-def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode):
-    """The Quantitative Scout Prompt Jordan liked (PPP, Splits, Efficiency)."""
+def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
+    """The Perfect Scout: Numerical breakdown Jordan liked (PPP, Splits, Efficiency)."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
     
-    prompt = (
-        f"Professional Sports Scout Report: {matchup} ({sport}). Target: {target} at {fd_p} (Edge: {edge:.1f}). "
-        f"Analyze injuries and rotation changes. You MUST provide a QUANTITATIVE breakdown including: "
-        f"1. ON/OFF SPLITS: Points per possession (PPP) and offensive/defensive efficiency impact for missing players. "
-        f"2. REPLACEMENT VALUE: Statistical comparison and PPP for the players taking those rotation minutes. "
-        f"3. USAGE IMPACT: How shots/touches shift to remaining starters. "
-        f"4. VERDICT: 🟢 PLAY, 🟡 WAIT, or 🛑 PASS based on these numerical impacts."
-    )
+    if type == "detailed":
+        prompt = (
+            f"Professional Sports Scout Report: {matchup} ({sport}). Target: {target} at {fd_p} (Edge: {edge:.1f}). "
+            f"Analyze injuries and rotation changes. You MUST provide a QUANTITATIVE breakdown including: "
+            f"1. ON/OFF SPLITS: Points per possession (PPP) and offensive/defensive efficiency impact for missing players. "
+            f"2. REPLACEMENT VALUE: Statistical comparison and PPP for the players taking those rotation minutes. "
+            f"3. USAGE IMPACT: How shots/touches shift to remaining starters. "
+            f"4. FINAL VERDICT: 🟢 PLAY, 🟡 WAIT, or 🛑 PASS based on these numerical impacts."
+        )
+    else:
+        prompt = f"Quick Scouting Report for {matchup} ({sport}) target {target}. Summarize rotation impact and give VERDICT."
     
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
     if mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.2)
     
     try:
         res = requests.post(url, json=payload, timeout=30).json()
-        return res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data available.')
-    except: return "⚠️ Intel Timeout. Try again."
+        return res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
+    except: return "⚠️ Intel Timeout."
 
 # --- SIDEBAR (RESTORED) ---
 with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
-    
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
         for key in list(st.session_state.keys()):
@@ -161,19 +163,14 @@ with tab1:
         min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
     with c2:
         st.write("**Leagues:**")
-        selected_leagues = []
+        c1a, c1b, c1c = st.columns(3); selected_leagues = []
         l_map = {"NBA": ("basketball_nba", "spreads"), "NHL": ("icehockey_nhl", "h2h"), "NCAA B": ("basketball_ncaab", "spreads"), "NFL": ("americanfootball_nfl", "spreads"), "NCAA F": ("americanfootball_ncaaf", "spreads")}
-        
-        # Restoration of the button-style checkbox grid
-        c1a, c1b, c1c = st.columns(3)
-        cols = [c1a, c1b, c1c, c1a, c1b]
+        btn_cols = [c1a, c1b, c1c, c1a, c1b]
         for i, (league, (s_key, mkt)) in enumerate(l_map.items()):
             active = st.session_state.get(f"active_{league}", True)
-            if cols[i].checkbox(f"{league}", value=active, key=f"cb_{league}"):
-                selected_leagues.append(league)
-                st.session_state[f"active_{league}"] = True
-            else:
-                st.session_state[f"active_{league}"] = False
+            if btn_cols[i].button(f"{'✅' if active else '⬜'} {league}", key=f"t1_btn_{league}", use_container_width=True):
+                st.session_state[f"active_{league}"] = not active; st.rerun()
+            if active: selected_leagues.append(league)
 
     if st.button("🚀 RUN MATH SCAN", use_container_width=True):
         new_res = []; discord_msg_list = []; audit = {"Total": 0, "Hits": 0}
@@ -214,7 +211,7 @@ with tab1:
                         if discord_live_url and alert_fp not in st.session_state.sent_alerts:
                             line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
                             scout_url = make_scout_link(f"{game['away_team']} @ {game['home_team']}", name)
-                            discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n* Matchup: {game['away_team']} @ {game['home_team']}\n[🔎 **SCOUTING**]({scout_url})")
+                            discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n[🔎 **SCOUTING**]({scout_url})")
                             st.session_state.sent_alerts.add(alert_fp)
                         
                         new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%I:%M %p')})
@@ -231,8 +228,12 @@ with tab1:
             st.subheader(f"{res['Target']} ({price_str})")
             st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
             c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
-            if st.button(f"🔎 GET NUMERICAL INTEL", key=f"t1d_{res['Matchup']}_{res['Sport']}", use_container_width=True):
-                st.session_state[f"id_{res['Matchup']}_{res['Sport']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode)
+            ca, cb = st.columns(2)
+            if ca.button(f"⚡ Quick Intel", key=f"t1q_{res['Matchup']}_{res['Sport']}", use_container_width=True):
+                st.session_state[f"iq_{res['Matchup']}_{res['Sport']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="quick")
+            if cb.button(f"🔎 Detailed Intel", key=f"t1d_{res['Matchup']}_{res['Sport']}", use_container_width=True):
+                st.session_state[f"id_{res['Matchup']}_{res['Sport']}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="detailed")
+            if f"iq_{res['Matchup']}_{res['Sport']}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}_{res['Sport']}"])
             if f"id_{res['Matchup']}_{res['Sport']}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{res['Sport']}"])
             if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{res['Sport']}", type="primary", use_container_width=True):
                 log_to_github_ledger({"Date": datetime.now().strftime("%m/%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
@@ -256,9 +257,12 @@ with tab2:
     for game in st.session_state.intel_results:
         with st.container(border=True):
             st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
-            # Fixed Key: matchup name + sport prevents DuplicateElementKey errors
-            if st.button(f"🔎 SCOUT INTEL", key=f"t2d_{game['Matchup']}_{game['Sport']}", use_container_width=True):
-                st.session_state[f"id_{game['Matchup']}_{game['Sport']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode)
+            qa, qb = st.columns(2)
+            if qa.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}_{game['Sport']}", use_container_width=True):
+                st.session_state[f"iq_{game['Matchup']}_{game['Sport']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="quick")
+            if qb.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}_{game['Sport']}", use_container_width=True):
+                st.session_state[f"id_{game['Matchup']}_{game['Sport']}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="detailed")
+            if f"iq_{game['Matchup']}_{game['Sport']}" in st.session_state: st.info(st.session_state[f"iq_{game['Matchup']}_{game['Sport']}"])
             if f"id_{game['Matchup']}_{game['Sport']}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}_{game['Sport']}"])
 
 with tab3:
