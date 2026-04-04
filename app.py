@@ -55,13 +55,11 @@ def to_american(decimal):
     except: return str(decimal)
 
 def make_gemini_link(matchup, sport, target, price, edge):
-    """Generates a direct, URL-safe deep link to Gemini."""
     prompt = (
         f"Using Google Search, find the latest injury reports and fatigue for {matchup} ({sport}). "
         f"Analyze betting on {target} at {price} with a {edge:.1f} edge vs sharp market. "
         f"Provide: PROS, CONS, THE CASE, and VERDICT (🟢 PLAY, 🟡 WAIT, or 🛑 PASS)."
     )
-    # quote_plus turns spaces into '+' which Gemini's 'q' parameter prefers
     encoded_prompt = urllib.parse.quote_plus(prompt)
     return f"https://gemini.google.com/app?q={encoded_prompt}"
 
@@ -88,6 +86,56 @@ def sync_ledger():
         st.session_state.last_sync = time.time()
         return True
     except: return False
+
+def auto_grade_ledger():
+    """Fetches scores and automatically settles pending bets."""
+    if not st.session_state.bet_history: return False
+    
+    df = pd.DataFrame(st.session_state.bet_history)
+    pending_mask = df['Result'] == 'Pending'
+    if not pending_mask.any(): return False
+    
+    # Map display names back to API keys
+    l_map_rev = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
+    
+    updated = False
+    for idx, row in df[pending_mask].iterrows():
+        sport_key = l_map_rev.get(row['Sport'])
+        if not sport_key: continue
+        
+        # Fetch scores for this sport
+        try:
+            scores_url = f"https://api.the-odds-api.com/v4/sports/{sport_key}/scores/"
+            scores_data = requests.get(scores_url, params={"apiKey": api_key, "daysFrom": 3}).json()
+            
+            for game in scores_data:
+                # Match by Team Names and Date (as fallback if ID isn't in old logs)
+                if row['Team'] in [game['home_team'], game['away_team']] and game.get('completed'):
+                    h_score = next((s['score'] for s in game['scores'] if s['name'] == game['home_team']), 0)
+                    a_score = next((s['score'] for s in game['scores'] if s['name'] == game['away_team']), 0)
+                    
+                    target_score = h_score if row['Team'] == game['home_team'] else a_score
+                    opp_score = a_score if row['Team'] == game['home_team'] else h_score
+                    
+                    # Grade based on Line
+                    line_val = str(row['Line'])
+                    if any(x in line_val for x in ['+', '-']) and '.' in line_val: # It's a spread
+                        spread = float(line_val)
+                        if (target_score + spread) > opp_score: df.at[idx, 'Result'] = "Win"
+                        elif (target_score + spread) < opp_score: df.at[idx, 'Result'] = "Loss"
+                        else: df.at[idx, 'Result'] = "Push"
+                    else: # It's Moneyline
+                        if target_score > opp_score: df.at[idx, 'Result'] = "Win"
+                        elif target_score < opp_score: df.at[idx, 'Result'] = "Loss"
+                        else: df.at[idx, 'Result'] = "Push"
+                    updated = True
+        except: continue
+        
+    if updated:
+        log_to_github_ledger({}, overwrite_df=df)
+        st.session_state.bet_history = df.to_dict('records')
+        return True
+    return False
 
 if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
@@ -260,14 +308,29 @@ with tab2:
 with tab3:
     st.header("📈 Performance Ledger")
     col_a, col_b = st.columns(2)
-    if col_a.button("🔄 REFRESH FROM GITHUB", use_container_width=True):
-        if sync_ledger(): st.toast("Synced!")
-        st.rerun()
+    
+    if col_a.button("🔄 AUTO-SETTLE PENDING BETS", use_container_width=True, type="primary"):
+        with st.spinner("Checking scores..."):
+            if auto_grade_ledger():
+                st.toast("Updated results from live scores!")
+                st.rerun()
+            else:
+                st.toast("No new results to settle yet.")
+
+    if col_b.button("🔄 REFRESH FROM GITHUB", use_container_width=True):
+        if sync_ledger(): 
+            st.toast("Data Synced!")
+            st.rerun()
+
     if st.session_state.bet_history:
         df = pd.DataFrame(st.session_state.bet_history)
+        df.index = range(1, len(df) + 1)
+        
         with st.expander("📝 MANUAL ADJUSTMENTS", expanded=False):
             edited = st.data_editor(df.iloc[::-1], column_config={"Result": st.column_config.SelectboxColumn(options=["Pending", "Win", "Loss", "Push"])}, use_container_width=True, hide_index=False)
             if st.button("💾 SAVE MANUAL GRADES"):
-                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]): st.success("Updated!"); time.sleep(1); st.rerun()
-        display_df = df.iloc[::-1].copy(); display_df.index = range(1, len(display_df) + 1)
-        st.dataframe(display_df, use_container_width=True)
+                if log_to_github_ledger({}, overwrite_df=edited.iloc[::-1]):
+                    st.success("Updated!"); time.sleep(1); st.rerun()
+        
+        st.subheader("Audit Trail")
+        st.dataframe(df.iloc[::-1], use_container_width=True)
