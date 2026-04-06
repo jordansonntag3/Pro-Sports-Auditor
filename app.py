@@ -191,7 +191,7 @@ with tab1:
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
             new_res, discord_msg_list, now_c = [], [], datetime.now(pytz.timezone('US/Central'))
-            today_str = now_c.strftime("%Y-%m-%d")
+            today_str = now_c.strftime("%m/%d/%Y")
             
             if horizon == "Today": max_time = now_c.replace(hour=23, minute=59, second=59)
             elif horizon == "Tomorrow": max_time = (now_c + timedelta(days=1)).replace(hour=23, minute=59, second=59)
@@ -281,7 +281,7 @@ with tab1:
                 if f"iq_{res['Matchup']}_{i}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}_{i}"])
                 if f"id_{res['Matchup']}_{i}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{i}"])
                 if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{i}", type="primary", use_container_width=True):
-                    log_to_github_ledger({"Date": datetime.now().strftime("%Y-%m-%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
+                    log_to_github_ledger({"Date": datetime.now().strftime("%m/%d/%Y"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
                     st.toast("Logged!"); st.rerun()
 
 with tab2:
