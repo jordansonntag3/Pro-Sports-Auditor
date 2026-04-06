@@ -158,7 +158,7 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Command Center")
-    grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
+    grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=0)
     mute_alerts = st.checkbox("🔇 Mute Discord during testing", value=False)
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
