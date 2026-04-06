@@ -176,7 +176,7 @@ with tab1:
     with c1:
         horizon = st.radio("Window:", ["Today", "Tomorrow", "Next 48 Hours"], horizontal=True)
         min_pt_edge = st.slider("Min Spread Edge (pts):", 0.5, 1.5, 0.5, 0.1)
-        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 10, 30, 10, 1)
+        min_ml_edge = st.slider("Min NHL ML Edge (cents):", 5, 10, 5, 1)
     with c2:
         st.write("**Leagues:**")
         c1a, c1b, c1c = st.columns(3); selected_leagues = []
