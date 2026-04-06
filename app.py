@@ -202,7 +202,7 @@ with tab1:
                 for game in data:
                     audit["Total"] += 1
                     comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
-                    if comm_c < now_c: continue
+                    if comm_c < now_c or comm_c > max_time: continue
                     
                     fd_a, pin_a, fd_h, pin_h = None, None, None, None
                     for b in game.get('bookmakers', []):
