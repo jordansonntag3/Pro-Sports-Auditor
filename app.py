@@ -240,6 +240,15 @@ with tab1:
         st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
         st.session_state.audit_data = audit; st.rerun()
 
+    if st.session_state.get("audit_data"):
+            a = st.session_state.audit_data
+            with st.container(border=True):
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Total Scanned", a.get('Total', 0))
+                c2.metric("Value Hits", a.get('Hits', 0))
+                # Calculates discarded games (Total minus the ones that met the edge floor)
+                c3.metric("Discarded", a.get('Total', 0) - a.get('Hits', 0))
+    
     for i, res in enumerate(st.session_state.scan_results):
         with st.container(border=True):
             price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
