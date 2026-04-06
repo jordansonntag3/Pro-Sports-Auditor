@@ -230,7 +230,7 @@ with tab1:
                         if mkt == 'h2h': edge_a, edge_h = edge_a * 100, edge_h * 100
                         floor = (min_ml_edge if mkt == 'h2h' else min_pt_edge) - 0.01
                         
-                        if True: # edge_a >= floor or edge_h >= floor:
+                        if edge_a >= floor or edge_h >= floor:
                             audit["Hits"] += 1
                             t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
                             
