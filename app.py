@@ -281,7 +281,7 @@ with tab1:
                 if f"iq_{res['Matchup']}_{i}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}_{i}"])
                 if f"id_{res['Matchup']}_{i}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{i}"])
                 if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{i}", type="primary", use_container_width=True):
-                    log_to_github_ledger({"Date": datetime.now().strftime("%m/%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
+                    log_to_github_ledger({"Date": datetime.now().strftime("%Y-%m-%d"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
                     st.toast("Logged!"); st.rerun()
 
 with tab2:
