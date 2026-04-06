@@ -266,7 +266,7 @@ with tab1:
                 cols[4].metric("Value Hits", a.get('Hits', 0))
 
         # RESULT CARDS (MOVED RIGHT TO STAY IN TAB 1)
-        for i, res in enumerate(st.session_state.scan_results):
+    for i, res in enumerate(st.session_state.scan_results):
             with st.container(border=True):
                 price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
                 st.subheader(f"{res['Target']} ({price_str})")
