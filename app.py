@@ -159,6 +159,7 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
 with st.sidebar:
     st.header("⚙️ Command Center")
     grounding_mode = st.radio("Grounding Mode:", ["Live Search", "Session Cache Only", "Math Only"], index=1)
+    mute_alerts = st.checkbox("🔇 Mute Discord during testing", value=False)
     if st.button("🔄 FULL SYSTEM RESET", use_container_width=True):
         st.cache_data.clear()
         for key in list(st.session_state.keys()):
@@ -234,7 +235,7 @@ with tab1:
                             audit["Hits"] += 1
                             t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
                             
-                            if discord_live_url and f"{t_team}_{today_str}" not in st.session_state.sent_alerts:
+                            if discord_live_url and not mute_alerts and f"{t_team}_{today_str}" not in st.session_state.sent_alerts:
                                 line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
                                 scout_url = make_scout_link(f"{game['away_team']} @ {game['home_team']}", name)
                                 discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n[🔎 **SCOUTING**]({scout_url})")
