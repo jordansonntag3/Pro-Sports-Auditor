@@ -255,7 +255,7 @@ with tab1:
             st.rerun()
 
         # AUDIT BAR (MOVED RIGHT TO STAY IN TAB 1)
-        if st.session_state.get("audit_data"):
+    if st.session_state.get("audit_data"):
             a = st.session_state.audit_data
             with st.container(border=True):
                 cols = st.columns(5)
