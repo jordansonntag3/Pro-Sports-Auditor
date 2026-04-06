@@ -190,7 +190,7 @@ with tab1:
                 st.session_state[f"active_{league}"] = not active; st.rerun()
             if active: selected_leagues.append(league)
 
-    if st.button("🚀 RUN MATH SCAN", use_container_width=True):
+    if st.button("🚀 RUN SCAN", use_container_width=True):
         new_res = []; discord_msg_list = []; audit = {"Total": 0, "Hits": 0}
         now_c = datetime.now(pytz.timezone('US/Central'))
         today_str = now_c.strftime("%Y-%m-%d")
