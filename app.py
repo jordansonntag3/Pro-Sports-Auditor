@@ -77,40 +77,60 @@ def sync_ledger():
     except: return False
 
 def auto_grade_ledger():
+    """Surgical Fix: Handles 'Arizona Wildcats' vs 'Arizona' and moves GitHub save outside the loop."""
     if not st.session_state.bet_history: return False
     df = pd.DataFrame(st.session_state.bet_history)
     pending_bets = df[df['Result'] == 'Pending']
     if pending_bets.empty: return False
 
-    l_map_rev = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
+    # Expanded map to handle all 5 leagues
+    l_map_rev = {
+        "NBA": "basketball_nba", 
+        "NHL": "icehockey_nhl", 
+        "NCAA B": "basketball_ncaab",
+        "NFL": "americanfootball_nfl",
+        "NCAA F": "americanfootball_ncaaf"
+    }
     updated = False
 
     for idx, row in pending_bets.iterrows():
         sport_key = l_map_rev.get(row['Sport'])
         if not sport_key: continue
         try:
+            # daysFrom=3 covers the Arizona game from yesterday perfectly
             scores = requests.get(f"https://api.the-odds-api.com/v4/sports/{sport_key}/scores/?apiKey={api_key}&daysFrom=3").json()
             for game in scores:
+                # FIX: Bi-directional matching (Arizona Wildcats matches Arizona)
                 game_teams = [game['home_team'].lower(), game['away_team'].lower()]
                 target_team = str(row['Team']).lower()
                 
-                if any(target_team in t for t in game_teams) and game.get('completed'):
+                # Check if ledger name is in API name OR API name is in ledger name
+                match_found = any(target_team in t or t in target_team for t in game_teams)
+                
+                if match_found and game.get('completed'):
                     h_score = next((s['score'] for s in game['scores'] if s['name'] == game['home_team']), 0)
                     a_score = next((s['score'] for s in game['scores'] if s['name'] == game['away_team']), 0)
-                    is_home = target_team in game['home_team'].lower()
-                    target_s = h_score if is_home else a_score
-                    opp_s = a_score if is_home else h_score
                     
+                    is_home = any(target_team in t or t in target_team for t in [game['home_team'].lower()])
+                    target_s = int(h_score) if is_home else int(a_score)
+                    opp_s = int(a_score) if is_home else int(h_score)
+                    
+                    # SPREAD MATH: Handles '+' and float conversion
                     line_val = float(str(row['Line']).replace('+', ''))
+                    
                     if (target_s + line_val) > opp_s: df.at[idx, 'Result'] = "Win"
                     elif (target_s + line_val) < opp_s: df.at[idx, 'Result'] = "Loss"
                     else: df.at[idx, 'Result'] = "Push"
                     updated = True
-        except: continue
+        except Exception as e:
+            st.error(f"Error grading {row['Team']}: {e}")
+            continue
     
+    # SUCCESS: Move save outside the loop for stability
     if updated:
         if log_to_github_ledger(overwrite_df=df):
             st.session_state.bet_history = df.to_dict('records')
+            st.success("Ledger settled and pushed to GitHub!")
             return True
     return False
 
