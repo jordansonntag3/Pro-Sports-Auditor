@@ -135,27 +135,32 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Model check: Ensure you are using a stable 2026 endpoint
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_key}"
+    # Using the stable 2026 version
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"STRATEGIC AUDIT: {matchup} ({sport}). Target: {target} at {fd_p}.\n"
+            f"COMPETITIVE ANALYSIS: {matchup} ({sport}). Subject: {target} (Baseline: {fd_p}).\n"
             "ACT AS A SENIOR STRATEGIC ANALYST. DO NOT REPEAT STATIC SEASON STATS. FOCUS ON SYSTEMIC SHIFTS.\n\n"
-            "1. MOMENTUM (Weighted Trend Divergence): Analyze if the team's performance over the last 10 games "
-            "deviates from their baseline. (NBA: Factor in late-season motivation. NHL: Analyze Weighted PDO/Momentum).\n"
-            "2. TACTICAL (Cross-Metric Outlier Alignment): Identify the target's top 5% statistical strength and "
+            "1. MOMENTUM (Weighted Trend Divergence): Analyze if the subject's performance over the last 10 games "
+            "deviates significantly from their baseline. (NBA: Factor in April motivation/seeding. NHL: Analyze Weighted PDO/Momentum).\n"
+            "2. TACTICAL (Cross-Metric Outlier Alignment): Identify the subject's top 5% statistical strength and "
             "the opponent's bottom 5% defensive weakness. Report the systemic mismatch (e.g., special teams vs. discipline).\n"
             "3. ROSTER (Identity Audit): Use morning news to analyze the 'Usage Vacuum'. How does the TEAM'S STYLE "
-            "fundamentally change without the players ruled out today? Who specifically gains?\n\n"
-            "FINAL VERDICT: Conclude with 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS based on if the discrepancy is a true value or a risk."
+            "fundamentally change without the personnel ruled out today? Who specifically gains?\n\n"
+            "STRATEGIC OUTLOOK: Conclude with 'High Positive Divergence', 'Neutral/Wait', or 'Significant Systemic Risk' "
+            "based on whether the current conditions favor the subject beyond the baseline valuation."
         )
     else:
-        prompt = f"Quick Scouting Report for {matchup} ({sport}). Summarize rotation impact and give VERDICT."
+        prompt = f"Quick Scouting Report for {matchup} ({sport}). Summarize personnel impact and give outlook."
     
-    # ADDED: Safety Settings to prevent the "No data" empty response
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.1,  # Lower temperature prevents "thinking loops"
+            "maxOutputTokens": 1000,
+            "topP": 0.95
+        },
         "safetySettings": [
             {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
             {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
@@ -169,13 +174,12 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
     
     try:
         res = requests.post(url, json=payload, timeout=30).json()
-        # BETTER PARSING: Handles empty candidates (Safety Blocks) more gracefully
         candidates = res.get('candidates', [])
+        
         if not candidates:
-            # Check for safety block specifically
-            if 'promptFeedback' in res:
-                return "🛡️ Security Block: Prompt flagged as high-risk gambling content."
-            return "⚠️ No Candidates: Model returned an empty response."
+            # Check for block reason in the metadata
+            block_reason = res.get('promptFeedback', {}).get('blockReason', 'UNKNOWN')
+            return f"🛡️ Analysis Refused (Reason: {block_reason}). The data-set might be too volatile for the current safety threshold."
         
         return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No text generated.')
     except Exception as e:
