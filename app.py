@@ -135,38 +135,35 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using the stable 2026 version
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
+        # FORCE LENGTH: Explicitly requiring paragraphs for each audit category
         prompt = (
-            f"COMPETITIVE ANALYSIS: {matchup} ({sport}). Subject: {target} (Baseline: {fd_p}).\n"
-            "ACT AS A SENIOR STRATEGIC ANALYST. DO NOT REPEAT STATIC SEASON STATS. FOCUS ON SYSTEMIC SHIFTS.\n\n"
-            "1. MOMENTUM (Weighted Trend Divergence): Analyze if the subject's performance over the last 10 games "
-            "deviates significantly from their baseline. (NBA: Factor in April motivation/seeding. NHL: Analyze Weighted PDO/Momentum).\n"
-            "2. TACTICAL (Cross-Metric Outlier Alignment): Identify the subject's top 5% statistical strength and "
-            "the opponent's bottom 5% defensive weakness. Report the systemic mismatch (e.g., special teams vs. discipline).\n"
-            "3. ROSTER (Identity Audit): Use morning news to analyze the 'Usage Vacuum'. How does the TEAM'S STYLE "
-            "fundamentally change without the personnel ruled out today? Who specifically gains?\n\n"
-            "STRATEGIC OUTLOOK: Conclude with 'High Positive Divergence', 'Neutral/Wait', or 'Significant Systemic Risk' "
-            "based on whether the current conditions favor the subject beyond the baseline valuation."
+            f"ADVANCED STRATEGIC AUDIT: {matchup} ({sport}). Target: {target} (Baseline: {fd_p}).\n"
+            "ACT AS A SENIOR ANALYST. YOU MUST PROVIDE A DETAILED MULTI-PARAGRAPH RESPONSE FOR EACH SECTION BELOW.\n\n"
+            "### 1. WEIGHTED TREND DIVERGENCE\n"
+            "Examine performance over the last 10 games vs. season baseline. Factor in April motivation (Tanking vs. Seeding).\n\n"
+            "### 2. CROSS-METRIC OUTLIER ALIGNMENT\n"
+            "Match the target's top 5% statistical strength against the opponent's bottom 5% defensive weakness. Find the systemic mismatch.\n\n"
+            "### 3. ROTATION IDENTITY AUDIT\n"
+            "Analyze today's news (April 7-8, 2026). How does the game STYLE change without the personnel ruled out today? Identify who fills the 'Usage Vacuum'.\n\n"
+            "**FINAL VERDICT:** 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS (Explain the trap if applicable)."
         )
     else:
-        prompt = f"Quick Scouting Report for {matchup} ({sport}). Summarize personnel impact and give outlook."
+        # FORCE BREVITY: Stripping sentences for pure data points
+        prompt = (
+            f"QUICK SCOUT: {matchup} ({sport}).\n"
+            "FORMAT: 3 Bullet points ONLY. Max 15 words per bullet.\n"
+            "1. Personnel: Status of key contributors.\n"
+            "2. Impact: Primary rotation shift.\n"
+            "3. Outlook: 1-sentence verdict."
+        )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.1,  # Lower temperature prevents "thinking loops"
-            "maxOutputTokens": 1000,
-            "topP": 0.95
-        },
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
-        ]
+        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500},
+        "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}]
     }
     
     if type == "detailed" or mode == "Live Search": 
@@ -174,16 +171,9 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
     
     try:
         res = requests.post(url, json=payload, timeout=30).json()
-        candidates = res.get('candidates', [])
-        
-        if not candidates:
-            # Check for block reason in the metadata
-            block_reason = res.get('promptFeedback', {}).get('blockReason', 'UNKNOWN')
-            return f"🛡️ Analysis Refused (Reason: {block_reason}). The data-set might be too volatile for the current safety threshold."
-        
-        return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No text generated.')
-    except Exception as e:
-        return f"⚠️ Intel Error: {str(e)}"
+        text = res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
+        return text
+    except: return "⚠️ Intel Timeout."
 
 # --- SIDEBAR ---
 with st.sidebar:
