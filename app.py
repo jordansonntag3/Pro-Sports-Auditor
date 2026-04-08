@@ -138,43 +138,50 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
-        # FORCE LENGTH: Explicitly requiring paragraphs for each audit category
+        # THE AUDITOR: Forced expansion using a template
         prompt = (
-            f"ADVANCED STRATEGIC AUDIT: {matchup} ({sport}). Target: {target} (Baseline: {fd_p}).\n"
-            "ACT AS A SENIOR ANALYST. YOU MUST PROVIDE A DETAILED MULTI-PARAGRAPH RESPONSE FOR EACH SECTION BELOW.\n\n"
-            "### 1. WEIGHTED TREND DIVERGENCE\n"
-            "Examine performance over the last 10 games vs. season baseline. Factor in April motivation (Tanking vs. Seeding).\n\n"
-            "### 2. CROSS-METRIC OUTLIER ALIGNMENT\n"
-            "Match the target's top 5% statistical strength against the opponent's bottom 5% defensive weakness. Find the systemic mismatch.\n\n"
-            "### 3. ROTATION IDENTITY AUDIT\n"
-            "Analyze today's news (April 7-8, 2026). How does the game STYLE change without the personnel ruled out today? Identify who fills the 'Usage Vacuum'.\n\n"
-            "**FINAL VERDICT:** 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS (Explain the trap if applicable)."
+            f"Perform an EXPANSIVE STRATEGIC AUDIT for {matchup} ({sport}) regarding {target}.\n"
+            "MANDATORY: You must write at least 3 sentences for EACH section below. Use the exact headers provided.\n\n"
+            "### 🟢 1. WEIGHTED TREND DIVERGENCE\n"
+            "(Analyze last 10 games vs season baseline. Factor in April motivation/seeding/tanking status.)\n\n"
+            "### 🔵 2. CROSS-METRIC OUTLIER ALIGNMENT\n"
+            "(Cross-reference the target's top strength vs. the opponent's bottom weakness. Explain the systemic mismatch.)\n\n"
+            "### 🟡 3. ROTATION IDENTITY AUDIT\n"
+            "(Analyze today's April 2026 news. How does the TEAM IDENTITY change without the players ruled out? Who fills the 'Usage Vacuum'?)\n\n"
+            "**FINAL VERDICT:** (🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS + 1-sentence logic)."
         )
     else:
-        # FORCE BREVITY: Stripping sentences for pure data points
+        # THE SCOUT: Strict "No-Fluff" constraint
         prompt = (
             f"QUICK SCOUT: {matchup} ({sport}).\n"
-            "FORMAT: 3 Bullet points ONLY. Max 15 words per bullet.\n"
-            "1. Personnel: Status of key contributors.\n"
+            "STRICT LIMIT: Exactly 3 bullet points. No intro text. No bold headers. Max 40 words total.\n"
+            "1. Personnel: Status of key players.\n"
             "2. Impact: Primary rotation shift.\n"
-            "3. Outlook: 1-sentence verdict."
+            "3. Verdict: 🟢, 🟡, or 🛑."
         )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.2, "maxOutputTokens": 1500},
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
         "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}]
     }
     
+    # Speed Optimization: Only use search if Detailed or if sidebar explicitly requests it
     if type == "detailed" or mode == "Live Search": 
-        payload["tools"] = [{"google_search": {}}]; time.sleep(1.2)
+        payload["tools"] = [{"google_search": {}}]
     
     try:
-        res = requests.post(url, json=payload, timeout=30).json()
-        text = res.get('candidates', [{}])[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
+        # Added a 40s timeout for complex searches
+        res = requests.post(url, json=payload, timeout=40).json()
+        candidates = res.get('candidates', [])
+        if not candidates: return "⚠️ Safety/Data Block."
+        
+        text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
+        # Cleanup: Remove the "Here's a scout" type intros if they slip through
+        if type == "quick" and ":" in text[:20]: text = text.split(":", 1)[-1].strip()
+        
         return text
     except: return "⚠️ Intel Timeout."
-
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Command Center")
