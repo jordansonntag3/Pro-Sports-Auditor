@@ -135,53 +135,58 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_key}"
+    # Using the stable 2026 Gemini 3 Flash model
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
     
     if type == "detailed":
-        # THE AUDITOR: Forced expansion using a template
         prompt = (
-            f"Perform an EXPANSIVE STRATEGIC AUDIT for {matchup} ({sport}) regarding {target}.\n"
-            "MANDATORY: You must write at least 3 sentences for EACH section below. Use the exact headers provided.\n\n"
+            f"SYSTEM: You are a Lead Strategic Auditor. Perform a 600-word DEEP-DIVE AUDIT for {matchup} ({sport}) regarding {target}.\n"
+            "INSTRUCTIONS: You must provide exactly three paragraphs for each section. Do not summarize.\n\n"
             "### 🟢 1. WEIGHTED TREND DIVERGENCE\n"
-            "(Analyze last 10 games vs season baseline. Factor in April motivation/seeding/tanking status.)\n\n"
+            "Search for the last 10 games. Contrast recent PPG/Defensive ratings against season averages. "
+            "Address April 2026 motivation: Is the team locked in seeding, tanking, or fighting for a play-in spot?\n\n"
             "### 🔵 2. CROSS-METRIC OUTLIER ALIGNMENT\n"
-            "(Cross-reference the target's top strength vs. the opponent's bottom weakness. Explain the systemic mismatch.)\n\n"
+            "Identify one specific elite stat (top 5%) for the target. Cross-reference it with the opponent's "
+            "worst defensive metric. Explain why this specific overlap creates a systemic failure in the spread.\n\n"
             "### 🟡 3. ROTATION IDENTITY AUDIT\n"
-            "(Analyze today's April 2026 news. How does the TEAM IDENTITY change without the players ruled out? Who fills the 'Usage Vacuum'?)\n\n"
-            "**FINAL VERDICT:** (🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS + 1-sentence logic)."
+            "Audit today's news (April 7-8, 2026). Analyze the 'Usage Vacuum' created by personnel ruled out. "
+            "How does the identity of the team on the floor right now differ from the identity that created the season stats?\n\n"
+            "**FINAL VERDICT:** 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS (Include a 'Trap Alert' if the math edge is fake)."
         )
     else:
-        # THE SCOUT: Strict "No-Fluff" constraint
         prompt = (
             f"QUICK SCOUT: {matchup} ({sport}).\n"
-            "STRICT LIMIT: Exactly 3 bullet points. No intro text. No bold headers. Max 40 words total.\n"
-            "1. Personnel: Status of key players.\n"
-            "2. Impact: Primary rotation shift.\n"
+            "STRICT: Return exactly 3 bullet points. No intro. No headers. Max 30 words.\n"
+            "1. Personnel: Who is in/out.\n"
+            "2. Impact: Rotation shift.\n"
             "3. Verdict: 🟢, 🟡, or 🛑."
         )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
+        "generationConfig": {
+            "temperature": 0.7, # Higher temp = more descriptive/lengthy
+            "maxOutputTokens": 2048, # Doubled to prevent the cutoff
+            "topP": 0.95
+        },
         "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}]
     }
     
-    # Speed Optimization: Only use search if Detailed or if sidebar explicitly requests it
+    # Enable Google Search
     if type == "detailed" or mode == "Live Search": 
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        # Added a 40s timeout for complex searches
-        res = requests.post(url, json=payload, timeout=40).json()
+        # Increased timeout to 60s for deep searches
+        res = requests.post(url, json=payload, timeout=60).json()
         candidates = res.get('candidates', [])
         if not candidates: return "⚠️ Safety/Data Block."
         
         text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
-        # Cleanup: Remove the "Here's a scout" type intros if they slip through
-        if type == "quick" and ":" in text[:20]: text = text.split(":", 1)[-1].strip()
-        
         return text
-    except: return "⚠️ Intel Timeout."
+    except Exception as e:
+        return f"⚠️ Intel Error: {str(e)}"
+        
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Command Center")
