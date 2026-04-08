@@ -135,62 +135,42 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using the stable 2026 stable endpoint
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_key}"
+    # Using 1.5-Flash: the most stable model for consistent output length
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"STRATEGIC OPERATIONS AUDIT: {matchup} ({sport}). Subject: {target}. Baseline Valuation: {fd_p}.\n"
-            "ACT AS A SENIOR OPERATIONS DIRECTOR. PERFORM A DEEP-DIVE PERSONNEL AND PERFORMANCE AUDIT. NO SHORT RESPONSES.\n\n"
-            "### 📉 1. WEIGHTED MOMENTUM DIVERGENCE\n"
-            "Analyze the subject's performance efficiency over the last 10 events compared to the seasonal benchmark. "
-            "For NBA events in April 2026: Address organizational motivation (Post-season positioning vs. Evaluative/Draft positioning).\n\n"
-            "### 🎯 2. TACTICAL EFFICIENCY OVERLAP\n"
-            "Identify the subject's primary operational strength (Top 5% metric). Cross-reference this with the "
-            "benchmark's primary defensive vulnerability (Bottom 5% metric). Explain the systemic advantage or failure.\n\n"
-            "### 👥 3. PERSONNEL LOGISTICS ANALYSIS\n"
-            "Audit today's personnel status (April 7-8, 2026). Analyze the 'Operational Vacuum' created by absent staff. "
-            "How does the identity of the unit currently on the floor differ from the baseline identity? Who gains the most 'Usage Volume'?\n\n"
-            "**STRATEGIC ALIGNMENT:** Conclude with '📈 STRONG POSITIVE DIVERGENCE', '⚖️ NEUTRAL/STABLE', or '⚠️ SIGNIFICANT SYSTEMIC RISK' "
-            "based on whether the current personnel conditions favor the subject over the current baseline valuation."
+            f"Provide a comprehensive scouting report for {matchup} ({sport}) regarding {target}.\n\n"
+            "Structure your response with these three sections:\n"
+            "1. PERSONNEL & INJURIES: List key players out and how it affects the rotation.\n"
+            "2. MATCHUP ANALYSIS: Discuss how these teams play against each other (Pace, Style, Strengths).\n"
+            "3. STRATEGIC OUTLOOK: Give a final recommendation based on the current price of {fd_p}.\n\n"
+            "Please provide detailed paragraphs for each section."
         )
     else:
-        prompt = (
-            f"QUICK LOGISTICS SUMMARY: {matchup} ({sport}).\n"
-            "Return 3 bullet points. No intro. Max 30 words.\n"
-            "1. Personnel: Status of key staff.\n"
-            "2. Logistics: Primary shift in unit identity.\n"
-            "3. Outlook: 📈, ⚖️, or ⚠️."
-        )
+        prompt = f"Provide a 3-bullet point summary of the rotation and injury news for {matchup} ({sport})."
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.3, # Low enough for consistency, high enough for detail
-            "maxOutputTokens": 1500,
-            "topP": 0.8
-        },
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
-        ]
+            "temperature": 0.4,
+            "maxOutputTokens": 1000
+        }
     }
     
-    if type == "detailed" or mode == "Live Search": 
+    # Use search only if explicitly enabled to keep things fast
+    if mode == "Live Search": 
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        # 45s timeout to allow for deep search synthesis
-        res = requests.post(url, json=payload, timeout=45).json()
+        # 30s timeout is standard for 1.5 Flash
+        res = requests.post(url, json=payload, timeout=30).json()
         candidates = res.get('candidates', [])
-        
-        if not candidates:
-            # Check for block reason
-            reason = res.get('promptFeedback', {}).get('blockReason', 'Unknown Safety Trigger')
-            return f"❌ Audit Refused: {reason}. The system may be detecting restricted keywords."
-        
-        return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No analysis generated.')
-    except Exception as e:
-        return f"⚠️ Audit Error: {str(e)}"
+        if candidates:
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
+        return "⚠️ Safety Block: Content restricted."
+    except:
+        return "⚠️ Connection Timeout."
         
 # --- SIDEBAR ---
 with st.sidebar:
