@@ -238,7 +238,7 @@ with tab1:
                             if discord_live_url and not mute_alerts and f"{t_team}_{today_str}" not in st.session_state.sent_alerts:
                                 line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
                                 scout_url = make_scout_link(f"{game['away_team']} @ {game['home_team']}", name)
-                                discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n[🔎 **SCOUTING**]({scout_url})")
+                                discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n[🔎 **SCOUTING**](<{scout_url}>)")
                                 st.session_state.sent_alerts.add(f"{t_team}_{today_str}")
                             
                             new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%I:%M %p')})
