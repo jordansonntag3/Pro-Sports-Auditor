@@ -135,20 +135,27 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key={_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"Intel Intelligence Report: {matchup} ({sport}). Target: {target} at {fd_p}.\n\n"
-            "1. ROSTER HEALTH & FATIGUE: Detail injuries, rest status, and schedule fatigue (B2B).\n"
-            "2. THE MISMATCH VERDICT: Quantitative analysis of why the line discrepancy exists (On/Off splits, PPP impact).\n"
-            "3. FINAL ACTION: Conclude with a definitive 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS."
+            f"STRATEGIC AUDIT: {matchup} ({sport}). Target: {target} at {fd_p}.\n"
+            "ACT AS A PRO-BETTING ANALYST. DO NOT REPEAT STATIC SEASON STATS. FOCUS ON SYSTEMIC SHIFTS.\n\n"
+            "1. WEIGHTED TREND DIVERGENCE: Identify if performance over the last 10 games significantly deviates from season baseline. "
+            "For NBA: Factor in April motivation (tanking vs. seeding). For NHL: Analyze Weighted PDO (Shooting% + Save%) momentum.\n"
+            "2. CROSS-METRIC OUTLIER ALIGNMENT: Identify the target's top 5% statistical strength and the opponent's bottom 5% defensive weakness. "
+            "Report the systemic mismatch (e.g., special teams disparity, specific unit failures, or style clashes).\n"
+            "3. ROTATION IDENTITY AUDIT: Use morning news to analyze the 'Usage Vacuum'. How does the TEAM'S STYLE (pace, shot selection, defensive profile) "
+            "fundamentally change without the players ruled out today? Who specifically gains from the increased usage?\n\n"
+            "FINAL VERDICT: Conclude with 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS based on if the 'Math Edge' is a trap."
         )
     else:
-        prompt = f"Quick Scouting Report for {matchup} ({sport}) target {target}. Summarize rotation impact and give VERDICT."
+        prompt = f"Quick Scouting Report for {matchup} ({sport}). Summarize rotation impact and give VERDICT."
     
     payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    if mode == "Live Search": payload["tools"] = [{"google_search": {}}]; time.sleep(1.2)
+    # Force Live Search for 'Detailed' to ensure morning news is captured
+    if type == "detailed" or mode == "Live Search": 
+        payload["tools"] = [{"google_search": {}}]; time.sleep(1.2)
     
     try:
         res = requests.post(url, json=payload, timeout=30).json()
