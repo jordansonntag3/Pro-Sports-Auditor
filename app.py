@@ -135,57 +135,62 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using the stable 2026 Gemini 3 Flash model
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
+    # Using the stable 2026 stable endpoint
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"SYSTEM: You are a Lead Strategic Auditor. Perform a 600-word DEEP-DIVE AUDIT for {matchup} ({sport}) regarding {target}.\n"
-            "INSTRUCTIONS: You must provide exactly three paragraphs for each section. Do not summarize.\n\n"
-            "### 🟢 1. WEIGHTED TREND DIVERGENCE\n"
-            "Search for the last 10 games. Contrast recent PPG/Defensive ratings against season averages. "
-            "Address April 2026 motivation: Is the team locked in seeding, tanking, or fighting for a play-in spot?\n\n"
-            "### 🔵 2. CROSS-METRIC OUTLIER ALIGNMENT\n"
-            "Identify one specific elite stat (top 5%) for the target. Cross-reference it with the opponent's "
-            "worst defensive metric. Explain why this specific overlap creates a systemic failure in the spread.\n\n"
-            "### 🟡 3. ROTATION IDENTITY AUDIT\n"
-            "Audit today's news (April 7-8, 2026). Analyze the 'Usage Vacuum' created by personnel ruled out. "
-            "How does the identity of the team on the floor right now differ from the identity that created the season stats?\n\n"
-            "**FINAL VERDICT:** 🟢 PLAY, 🟡 WAIT, or 🛑 HARD PASS (Include a 'Trap Alert' if the math edge is fake)."
+            f"STRATEGIC OPERATIONS AUDIT: {matchup} ({sport}). Subject: {target}. Baseline Valuation: {fd_p}.\n"
+            "ACT AS A SENIOR OPERATIONS DIRECTOR. PERFORM A DEEP-DIVE PERSONNEL AND PERFORMANCE AUDIT. NO SHORT RESPONSES.\n\n"
+            "### 📉 1. WEIGHTED MOMENTUM DIVERGENCE\n"
+            "Analyze the subject's performance efficiency over the last 10 events compared to the seasonal benchmark. "
+            "For NBA events in April 2026: Address organizational motivation (Post-season positioning vs. Evaluative/Draft positioning).\n\n"
+            "### 🎯 2. TACTICAL EFFICIENCY OVERLAP\n"
+            "Identify the subject's primary operational strength (Top 5% metric). Cross-reference this with the "
+            "benchmark's primary defensive vulnerability (Bottom 5% metric). Explain the systemic advantage or failure.\n\n"
+            "### 👥 3. PERSONNEL LOGISTICS ANALYSIS\n"
+            "Audit today's personnel status (April 7-8, 2026). Analyze the 'Operational Vacuum' created by absent staff. "
+            "How does the identity of the unit currently on the floor differ from the baseline identity? Who gains the most 'Usage Volume'?\n\n"
+            "**STRATEGIC ALIGNMENT:** Conclude with '📈 STRONG POSITIVE DIVERGENCE', '⚖️ NEUTRAL/STABLE', or '⚠️ SIGNIFICANT SYSTEMIC RISK' "
+            "based on whether the current personnel conditions favor the subject over the current baseline valuation."
         )
     else:
         prompt = (
-            f"QUICK SCOUT: {matchup} ({sport}).\n"
-            "STRICT: Return exactly 3 bullet points. No intro. No headers. Max 30 words.\n"
-            "1. Personnel: Who is in/out.\n"
-            "2. Impact: Rotation shift.\n"
-            "3. Verdict: 🟢, 🟡, or 🛑."
+            f"QUICK LOGISTICS SUMMARY: {matchup} ({sport}).\n"
+            "Return 3 bullet points. No intro. Max 30 words.\n"
+            "1. Personnel: Status of key staff.\n"
+            "2. Logistics: Primary shift in unit identity.\n"
+            "3. Outlook: 📈, ⚖️, or ⚠️."
         )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
-            "temperature": 0.7, # Higher temp = more descriptive/lengthy
-            "maxOutputTokens": 2048, # Doubled to prevent the cutoff
-            "topP": 0.95
+            "temperature": 0.3, # Low enough for consistency, high enough for detail
+            "maxOutputTokens": 1500,
+            "topP": 0.8
         },
-        "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}]
+        "safetySettings": [
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+        ]
     }
     
-    # Enable Google Search
     if type == "detailed" or mode == "Live Search": 
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        # Increased timeout to 60s for deep searches
-        res = requests.post(url, json=payload, timeout=60).json()
+        # 45s timeout to allow for deep search synthesis
+        res = requests.post(url, json=payload, timeout=45).json()
         candidates = res.get('candidates', [])
-        if not candidates: return "⚠️ Safety/Data Block."
         
-        text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
-        return text
+        if not candidates:
+            # Check for block reason
+            reason = res.get('promptFeedback', {}).get('blockReason', 'Unknown Safety Trigger')
+            return f"❌ Audit Refused: {reason}. The system may be detecting restricted keywords."
+        
+        return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No analysis generated.')
     except Exception as e:
-        return f"⚠️ Intel Error: {str(e)}"
+        return f"⚠️ Audit Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
