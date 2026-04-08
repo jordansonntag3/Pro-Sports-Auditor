@@ -313,16 +313,32 @@ with tab2:
 with tab3:
     st.header("📈 Performance Ledger")
     c1, c2 = st.columns(2)
+    
+    # Combined Button Logic
     if c1.button("🔄 AUTO-SETTLE PENDING", use_container_width=True, type="primary"):
-        if auto_grade_ledger(): st.rerun()
+        if auto_grade_ledger(): 
+            st.rerun()
+            
     if c2.button("🔄 REFRESH GITHUB", use_container_width=True):
-        if sync_ledger(): st.rerun()
-    if st.session_state.bet_history:
+        # We wrap this in a check to show the error if it fails
+        if sync_ledger(): 
+            st.rerun()
+        else:
+            st.error("🚨 Ledger Sync Failed! Check the sidebar for the specific error.")
+
+    # Table Display Logic
+    if st.session_state.get('bet_history'):
         df = pd.DataFrame(st.session_state.bet_history)
         df.index = range(1, len(df) + 1)
+        
         with st.expander("📝 MANUAL GRADE (Hard Commit)", expanded=False):
             edited = st.data_editor(df.iloc[::-1], use_container_width=True)
             if st.button("💾 PUSH TO GITHUB"):
                 st.session_state.bet_history = edited.iloc[::-1].to_dict('records')
-                if log_to_github_ledger(overwrite_df=edited.iloc[::-1]): st.success("Updated!"); st.rerun()
+                if log_to_github_ledger(overwrite_df=edited.iloc[::-1]): 
+                    st.success("Updated!")
+                    st.rerun()
+        
         st.dataframe(df.iloc[::-1], use_container_width=True)
+    else:
+        st.warning("No bet history found. Hit 'Refresh GitHub' to pull your data.")
