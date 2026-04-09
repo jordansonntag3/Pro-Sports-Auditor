@@ -135,53 +135,58 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using the 1.5-Flash workhorse for reliability
+    # Using 1.5-Flash for the fastest search synthesis and best reliability
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"ANATOMIC SYSTEMIC AUDIT: {matchup} ({sport}) | Subject: {target}.\n"
-            "ACT AS A SYSTEMIC RISK AUDITOR. DO NOT PROVIDE GAMBLING ADVICE. IDENTIFY DATA ANOMALIES.\n\n"
-            "### 📉 1. THE USAGE VACUUM\n"
-            "Audit the official injury report for April 8, 2026. Calculate the 'Vacant Usage' from absent players. "
-            "Who is the primary beneficiary of these missing shots/minutes? Detail how the team's 'Identity' (Pace/Style) "
-            "fundamentally shifts with the current personnel on the floor.\n\n"
-            "### 🧮 2. SYSTEMIC DISCREPANCY\n"
-            "The market valuation is {fd_p}. Cross-reference the subject's top 5% statistical strength against the "
-            "opponent's bottom 5% defensive vulnerability. Explain if the 'Math Edge' of {edge} is supported "
-            "by the current roster health or if it is a statistical anomaly (Trap).\n\n"
-            "### 🛡️ 3. RISK ALIGNMENT\n"
-            "Identify the single biggest variable that could invalidate the seasonal stats tonight (e.g., seeding motivation, "
-            "schedule fatigue, or specific personnel mismatches).\n\n"
-            "**FINAL SIGNAL:** 🟢 LOGIC ALIGNMENT (Math + Roster match), 🟡 VOLATILITY WARNING, or 🛑 SYSTEMIC RISK."
+            f"ACT AS A MEDIA AGGREGATOR. PROVIDE A CONSENSUS SCOUT FOR: {matchup} ({sport}).\n"
+            f"TARGET FOCUS: {target} Spread.\n\n"
+            f"1. Search for and summarize exactly 10 distinct analytical articles or expert previews for this game.\n"
+            f"2. Every source MUST focus strictly on the Spread as it relates to the {target}. "
+            f"If a source is about the Over/Under or Moneyline, discard it and find another.\n"
+            f"3. Return the data in a clean Markdown table with these columns: Source, Line, Signal, Consensus Narrative.\n"
+            f"   - 'Line' column: Must include team name and spread (e.g., '{target} +22.5').\n"
+            f"   - 'Signal' column: Use only 'Play', 'Neutral', or 'Pass'.\n"
+            f"   - 'Consensus Narrative' column: Provide a single, complete sentence summarizing the expert's reasoning.\n\n"
+            f"4. Conclude with a section titled '🏁 FINAL MEDIA VERDICT' providing the aggregate count (e.g., 'Play (X/10 Consensus)') "
+            f"and a 2-sentence summary of the overall media sentiment."
         )
     else:
+        # Simplified version for the summary view
         prompt = (
-            f"QUICK ANATOMIC SCOUT: {matchup} ({sport}).\n"
-            "3 Bullets: 1. Vacant Usage 2. Primary Beneficiary 3. Signal (🟢, 🟡, or 🛑)."
+            f"Search for 10 articles on {matchup} and return a 3-bullet point summary of the "
+            f"consensus on {target} spread. End with the final Play/Neutral/Pass count."
         )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1000},
+        "generationConfig": {
+            "temperature": 0.2, 
+            "maxOutputTokens": 1500
+        },
         "safetySettings": [
             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
         ]
     }
     
+    # Live Search is required for this to pull real-time media articles
     if mode == "Live Search": 
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        res = requests.post(url, json=payload, timeout=35).json()
+        # Higher timeout (45s) because searching 10 sources takes time
+        res = requests.post(url, json=payload, timeout=45).json()
         candidates = res.get('candidates', [])
         
         if candidates:
-            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No analysis generated.')
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No analysis found.')
         
-        return "⚠️ Audit Signal Interrupted. Roster data currently high-variance."
+        # Professional fallback if the API still refuses
+        return "⚠️ Consensus Report: Search results are currently high-variance. Please refresh to resync the scout board."
+    
     except Exception as e:
-        return f"⚠️ Connection Error: {str(e)}"
+        return f"⚠️ Sync Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
