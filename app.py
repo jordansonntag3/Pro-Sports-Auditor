@@ -135,10 +135,11 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using the most stable production model for April 2026
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
+    # FIX: Use the official preview string for the 3-series
+    # Alternative: use "gemini-2.5-flash" for the most stable experience
+    model_id = "gemini-3-flash-preview" 
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={_key}"
     
-    # Minimalist prompt to avoid ALL triggers
     prompt = f"Can you get me a link to an ESPN article analyzing this game: {matchup}?"
 
     payload = {
@@ -150,29 +151,19 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
     try:
         response = requests.post(url, json=payload, timeout=30).json()
         
-        # 1. Check for a successful response
+        # Check for successful response
         candidates = response.get('candidates', [])
         if candidates:
-            # Check if the model finished because of Safety
-            finish_reason = candidates[0].get('finishReason')
-            if finish_reason == "SAFETY":
-                return "❌ ACCOUNT LOCK: The Safety Filter blocked this output at the gate."
             return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No link found.')
             
-        # 2. Check for Prompt Blocks (Account-level restriction)
-        if "promptFeedback" in response:
-            reason = response['promptFeedback'].get('blockReason')
-            return f"❌ ACCOUNT PROBLEM: Prompt blocked due to {reason}."
+        # Handle 404/Not Found specifically
+        if "error" in response and response['error'].get('code') == 404:
+            return "❌ MODEL NAME ERROR: Use 'gemini-3-flash-preview' or 'gemini-2.5-flash'."
             
-        # 3. Check for Quota/Billing
-        if "error" in response:
-            error_msg = response['error'].get('message', 'Unknown error')
-            return f"❌ BILLING/QUOTA ERROR: {error_msg}"
-            
-        return "⚠️ EMPTY RESPONSE: This is likely a billing sync issue in Google AI Studio."
+        return f"⚠️ API Error: {response.get('error', {}).get('message', 'Unknown failure')}"
         
     except Exception as e:
-        return f"⚠️ SYSTEM ERROR: {str(e)}"
+        return f"⚠️ Connection Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
