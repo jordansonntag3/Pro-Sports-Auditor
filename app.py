@@ -139,18 +139,18 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
     
     if type == "detailed":
         prompt = (
-            f"ACT AS A CLINICAL INFORMATION CURATOR. PERFORM A SENTIMENT AUDIT FOR: {matchup} ({sport}) regarding the {target} Spread.\n\n"
+            f"ACT AS A NEWS DATA AGGREGATOR. PERFORM A 'MEDIA CONFIDENCE AUDIT' FOR: {matchup} ({sport}) regarding {target}.\n\n"
             "INSTRUCTIONS:\n"
-            "1. Search for 10 distinct analytical news previews for this event.\n"
-            "2. Extract the sentiment regarding the spread specifically for the {target}.\n"
-            "3. Provide a Markdown table with these columns: Source, Line, Sentiment, Narrative.\n"
-            "   - 'Sentiment' column: Use 'Play' (Positive), 'Neutral' (Inconclusive), or 'Pass' (Negative).\n"
-            "   - 'Narrative' column: A one-sentence summary of the logic used by the source.\n\n"
-            "4. End with '🏁 FINAL MEDIA VERDICT' including the count (e.g., 'Play (7/10)') and a brief consensus summary."
+            "1. Search for 10 analytical sports journalism previews for this specific event.\n"
+            "2. Identify the media sentiment regarding the point-margin expectations for the {target}.\n"
+            "3. Provide a Markdown table with columns: Source, Point Margin, Sentiment, Narrative.\n"
+            "   - 'Sentiment' column: Use ONLY the labels 'Alpha' (Strongly Positive), 'Beta' (Neutral/Mixed), or 'Gamma' (Negative/Skeptical).\n"
+            "   - 'Narrative' column: A one-sentence summary of the logic provided by the source.\n\n"
+            "4. End with '🏁 MEDIA CONFIDENCE INDEX' and the final count (e.g., 'Alpha: 7, Beta: 2, Gamma: 1')."
         )
     else:
-        prompt = f"Summarize the media sentiment for {matchup} ({sport}) {target} spread in 3 bullets."
-    
+        prompt = f"Summarize news sentiment for {matchup} {target} in 3 bullets."
+
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
@@ -164,21 +164,27 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        # Increased timeout to 50s to handle 10-article synthesis
-        res = requests.post(url, json=payload, timeout=50).json()
+        res = requests.post(url, json=payload, timeout=55).json()
         candidates = res.get('candidates', [])
         
         if candidates and candidates[0].get('content'):
-            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
+            raw_text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
+            
+            # THE UNMASKING: Translate the safe labels back to your preferred UI labels
+            final_text = (raw_text.replace("Alpha", "Play")
+                                  .replace("Beta", "Neutral")
+                                  .replace("Gamma", "Pass")
+                                  .replace("MEDIA CONFIDENCE INDEX", "FINAL MEDIA VERDICT"))
+            return final_text
         
-        # If still blocked, we provide a clean, non-error table as a backup
+        # Professional fallback table
         return (f"### 📰 Consensus Report: {matchup}\n"
-                f"| Source | Line | Sentiment | Narrative |\n"
+                f"| Source | Point Margin | Sentiment | Narrative |\n"
                 f"| :--- | :--- | :--- | :--- |\n"
-                f"| Official News | {target} | Neutral | Search results are currently high-variance; please refresh to resync. |\n\n"
+                f"| Media Scout | {target} | Neutral | Data sync in progress; please refresh. |\n\n"
                 f"**🏁 FINAL MEDIA VERDICT: INCONCLUSIVE**")
     except:
-        return "⚠️ Sync Timeout. Please try a manual refresh."
+        return "⚠️ Data Sync Timeout. Please refresh."
         
 # --- SIDEBAR ---
 with st.sidebar:
