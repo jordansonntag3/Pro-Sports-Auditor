@@ -135,37 +135,33 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using 1.5-Flash for speed and live search grounding
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"THE INTELLIGENCE REPORT: {matchup} ({sport}) | Subject: {target}.\n"
-            "Output a structured breakdown for this game including:\n\n"
-            "### Roster Health & Fatigue\n"
-            "Who is injured, who is resting, and who is tired. Provide specific details from today's news.\n\n"
-            "### The Mismatch Verdict\n"
-            "Provide your analysis of exactly why the line discrepancy exists based on the news. "
-            f"Compare the target of {target} against the current market data of {fd_p}.\n\n"
-            "### Final Action\n"
-            "Conclude with a definitive, intelligence-backed recommendation (e.g., 🟢 PLAY or 🛑 HARD PASS). "
-            "You are expected to actively override the raw math if the roster intelligence invalidates the edge."
+            f"ACT AS A CLINICAL SPORTS DATA SCRIBE. PERFORM A PERSONNEL AND LOGISTICAL AUDIT FOR: {matchup} ({sport}).\n\n"
+            "### 1. PERSONNEL AVAILABILITY REPORT\n"
+            "List all players officially ruled out or designated as doubtful. Detail the specific injury "
+            "classification and the number of regular-season minutes/starts vacated by these absences.\n\n"
+            "### 2. ROTATION IMPACT ANALYSIS\n"
+            "Identify the players designated to absorb the vacated minutes. Compare their seasonal "
+            "efficiency metrics (e.g., PER or TS%) against the starters they are replacing.\n\n"
+            "### 3. SCHEDULE DENSITY AUDIT\n"
+            "Calculate the fatigue factor: Total games played in the last 7 days, travel distance "
+            "traversed in the last 24 hours, and current altitude/environment variables.\n\n"
+            "### 4. DATA DISCREPANCY SCORE\n"
+            "On a scale of 1-10, measure the 'Information Delta.' \n"
+            "1 = Roster matches seasonal averages. \n"
+            "10 = Roster is fundamentally unrecognizable from seasonal averages (Extreme Variance)."
         )
     else:
-        # Standard summary fallback
-        prompt = f"Provide a quick scouting report on {matchup} ({sport}) for {target}. End with a 🟢 PLAY or 🛑 HARD PASS."
+        prompt = f"Clinical personnel summary for {matchup}. Output Data Discrepancy Score: [X]."
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.2, 
-            "maxOutputTokens": 1000
-        },
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
         "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"}
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
         ]
     }
     
@@ -173,15 +169,13 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        res = requests.post(url, json=payload, timeout=40).json()
+        res = requests.post(url, json=payload, timeout=45).json()
         candidates = res.get('candidates', [])
-        
-        if candidates:
+        if candidates and candidates[0].get('content'):
             return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
-        
-        return "⚠️ Intelligence Report Interrupted. Please refresh to resync."
+        return "⚠️ Audit Interrupted. Roster data is currently outside of expected parameters."
     except Exception as e:
-        return f"⚠️ Connection Error: {str(e)}"
+        return f"⚠️ Sync Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
