@@ -134,18 +134,16 @@ def auto_grade_ledger():
             return True
     return False
 
-import requests
-
-def get_espn_link(matchup, _key):
-    # Using the Gemini 3 Flash production endpoint (2026)
+def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
+    # Using the production Gemini 3 Flash model
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
     
-    # The specific minimalist prompt you requested
+    # The absolute minimalist prompt to bypass all safety filters
     prompt = f"Can you get me a link to an ESPN article analyzing this game: {matchup}?"
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}],  # Tool is required to fetch live URLs
+        "tools": [{"google_search": {}}],  # Required to fetch live URLs
         "generationConfig": {
             "temperature": 0.1,
             "maxOutputTokens": 200
@@ -153,18 +151,18 @@ def get_espn_link(matchup, _key):
     }
     
     try:
-        # Standard 30-second timeout for a web search
         response = requests.post(url, json=payload, timeout=30).json()
         
+        # Check for candidates (successful response)
         candidates = response.get('candidates', [])
         if candidates:
-            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No link returned.')
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No link found.')
             
-        # This will tell you if the 'Gatekeeper' blocked the prompt or the search result
+        # Check for safety blocks
         if "promptFeedback" in response:
-            return f"❌ Blocked by Safety Filter: {response['promptFeedback'].get('blockReason')}"
+            return f"❌ Blocked by Safety: {response['promptFeedback'].get('blockReason')}"
             
-        return "⚠️ Empty response from API."
+        return "⚠️ Empty response from API. Check your Google Cloud console for billing/quota."
         
     except Exception as e:
         return f"⚠️ Connection Error: {str(e)}"
