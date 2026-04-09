@@ -135,28 +135,31 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
+    # Using 1.5-Flash for rapid search synthesis
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"ACT AS A NEWS DATA AGGREGATOR. PERFORM A 'MEDIA CONFIDENCE AUDIT' FOR: {matchup} ({sport}) regarding {target}.\n\n"
+            f"ACT AS A CLINICAL DATA RECORDER. PERFORM A MEDIA AUDIT FOR: {matchup} ({sport}).\n\n"
+            f"BENCHMARK: The current market valuation for {target} is {fd_p}.\n"
+            f"TASK: Find exactly 10 distinct sports journalism previews for this specific event.\n\n"
             "INSTRUCTIONS:\n"
-            "1. Search for 10 analytical sports journalism previews for this specific event.\n"
-            "2. Identify the media sentiment regarding the point-margin expectations for the {target}.\n"
-            "3. Provide a Markdown table with columns: Source, Point Margin, Sentiment, Narrative.\n"
-            "   - 'Sentiment' column: Use ONLY the labels 'Alpha' (Strongly Positive), 'Beta' (Neutral/Mixed), or 'Gamma' (Negative/Skeptical).\n"
-            "   - 'Narrative' column: A one-sentence summary of the logic provided by the source.\n\n"
-            "4. End with '🏁 MEDIA CONFIDENCE INDEX' and the final count (e.g., 'Alpha: 7, Beta: 2, Gamma: 1')."
+            "1. Compare every expert conclusion to the BENCHMARK provided above.\n"
+            "2. Create a Markdown table with exactly three columns: **Source**, **Market Stance**, and **Consensus Narrative**.\n"
+            "   - **Market Stance**: Label as 'Agrees' (if they favor the {target} side), 'Disagrees' (if they favor the opponent), or 'Neutral'.\n"
+            "   - **Consensus Narrative**: Provide a single, complete sentence explaining WHY they take that stance.\n"
+            "3. **CRITICAL**: Do NOT include the numeric point spread or moneyline value in the table columns. Use only the Stance labels.\n\n"
+            "4. End with '🏁 FINAL MEDIA VERDICT' showing the aggregate count (e.g., 'Agrees: 9/10') and a 2-sentence summary of the total sentiment."
         )
     else:
-        prompt = f"Summarize news sentiment for {matchup} {target} in 3 bullets."
+        # Streamlined summary for the performance ledger/main view
+        prompt = f"Summarize news sentiment for {matchup} {target} relative to {fd_p} in 3 bullets."
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
         "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"}
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
         ]
     }
     
@@ -164,27 +167,17 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        res = requests.post(url, json=payload, timeout=55).json()
+        # 50s timeout to allow for the 10-article deep search
+        res = requests.post(url, json=payload, timeout=50).json()
         candidates = res.get('candidates', [])
         
         if candidates and candidates[0].get('content'):
-            raw_text = candidates[0].get('content', {}).get('parts', [{}])[0].get('text', '')
-            
-            # THE UNMASKING: Translate the safe labels back to your preferred UI labels
-            final_text = (raw_text.replace("Alpha", "Play")
-                                  .replace("Beta", "Neutral")
-                                  .replace("Gamma", "Pass")
-                                  .replace("MEDIA CONFIDENCE INDEX", "FINAL MEDIA VERDICT"))
-            return final_text
+            # Return the cleaned table directly to your Streamlit/App UI
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
         
-        # Professional fallback table
-        return (f"### 📰 Consensus Report: {matchup}\n"
-                f"| Source | Point Margin | Sentiment | Narrative |\n"
-                f"| :--- | :--- | :--- | :--- |\n"
-                f"| Media Scout | {target} | Neutral | Data sync in progress; please refresh. |\n\n"
-                f"**🏁 FINAL MEDIA VERDICT: INCONCLUSIVE**")
-    except:
-        return "⚠️ Data Sync Timeout. Please refresh."
+        return "### 📰 Consensus Report: Logic Syncing...\n*The audit was interrupted by a safety filter. Refresh to resync.*"
+    except Exception as e:
+        return f"⚠️ Sync Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
