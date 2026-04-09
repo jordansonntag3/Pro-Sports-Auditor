@@ -134,48 +134,40 @@ def auto_grade_ledger():
             return True
     return False
 
-def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
+import requests
+
+def get_espn_link(matchup, _key):
+    # Using the Gemini 3 Flash production endpoint (2026)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
     
-    if type == "detailed":
-        prompt = (
-            f"ACT AS A CLINICAL SPORTS DATA SCRIBE. PERFORM A PERSONNEL AND LOGISTICAL AUDIT FOR: {matchup} ({sport}).\n\n"
-            "### 1. PERSONNEL AVAILABILITY REPORT\n"
-            "List all players officially ruled out or designated as doubtful. Detail the specific injury "
-            "classification and the number of regular-season minutes/starts vacated by these absences.\n\n"
-            "### 2. ROTATION IMPACT ANALYSIS\n"
-            "Identify the players designated to absorb the vacated minutes. Compare their seasonal "
-            "efficiency metrics (e.g., PER or TS%) against the starters they are replacing.\n\n"
-            "### 3. SCHEDULE DENSITY AUDIT\n"
-            "Calculate the fatigue factor: Total games played in the last 7 days, travel distance "
-            "traversed in the last 24 hours, and current altitude/environment variables.\n\n"
-            "### 4. DATA DISCREPANCY SCORE\n"
-            "On a scale of 1-10, measure the 'Information Delta.' \n"
-            "1 = Roster matches seasonal averages. \n"
-            "10 = Roster is fundamentally unrecognizable from seasonal averages (Extreme Variance)."
-        )
-    else:
-        prompt = f"Clinical personnel summary for {matchup}. Output Data Discrepancy Score: [X]."
+    # The specific minimalist prompt you requested
+    prompt = f"Can you get me a link to an ESPN article analyzing this game: {matchup}?"
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 1000},
-        "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
-        ]
+        "tools": [{"google_search": {}}],  # Tool is required to fetch live URLs
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 200
+        }
     }
     
-    if mode == "Live Search": 
-        payload["tools"] = [{"google_search": {}}]
-    
     try:
-        res = requests.post(url, json=payload, timeout=45).json()
-        candidates = res.get('candidates', [])
-        if candidates and candidates[0].get('content'):
-            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No data.')
-        return "⚠️ Audit Interrupted. Roster data is currently outside of expected parameters."
+        # Standard 30-second timeout for a web search
+        response = requests.post(url, json=payload, timeout=30).json()
+        
+        candidates = response.get('candidates', [])
+        if candidates:
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No link returned.')
+            
+        # This will tell you if the 'Gatekeeper' blocked the prompt or the search result
+        if "promptFeedback" in response:
+            return f"❌ Blocked by Safety Filter: {response['promptFeedback'].get('blockReason')}"
+            
+        return "⚠️ Empty response from API."
+        
     except Exception as e:
-        return f"⚠️ Sync Error: {str(e)}"
+        return f"⚠️ Connection Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
