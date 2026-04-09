@@ -135,44 +135,37 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using 1.5-Flash for maximum stability and safety-bypass
+    # Using the 1.5-Flash workhorse for reliability
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
     
     if type == "detailed":
         prompt = (
-            f"PERFORMANCE AUDIT: {matchup} ({sport}). Subject: {target}. Baseline: {fd_p}.\n"
-            "ACT AS A SENIOR STRATEGIC ANALYST. PROVIDE A DEEP-DIVE PERSONNEL AND PERFORMANCE AUDIT.\n\n"
-            "### 📈 1. WEIGHTED MOMENTUM DIVERGENCE\n"
-            "Analyze performance efficiency over the last 10 events compared to seasonal benchmarks. "
-            "Address organizational motivation (Post-season positioning vs. Evaluative status).\n\n"
-            "### 🎯 2. TACTICAL EFFICIENCY OVERLAP\n"
-            "Identify the subject's primary operational strength (Top 5% metric) and cross-reference with "
-            "the opponent's primary defensive vulnerability (Bottom 5% metric).\n\n"
-            "### 👥 3. PERSONNEL LOGISTICS ANALYSIS\n"
-            "Audit current personnel status. Analyze the 'Usage Vacuum' created by absent staff. "
-            "How does unit identity change without these individuals? Who gains the most 'Usage Volume'?\n\n"
-            "### 📝 STRATEGIC IMPACT MATRIX\n"
-            "Provide a table with these rows: Personnel Volatility, Motivation Divergence, Tactical Advantage. "
-            "Rate each 1-10 with a brief reason.\n\n"
-            "**STRATEGIC ALIGNMENT:** Conclude with 📈 STRONG POSITIVE DIVERGENCE, ⚖️ NEUTRAL/STABLE, or ⚠️ SIGNIFICANT SYSTEMIC RISK."
+            f"ANATOMIC SYSTEMIC AUDIT: {matchup} ({sport}) | Subject: {target}.\n"
+            "ACT AS A SYSTEMIC RISK AUDITOR. DO NOT PROVIDE GAMBLING ADVICE. IDENTIFY DATA ANOMALIES.\n\n"
+            "### 📉 1. THE USAGE VACUUM\n"
+            "Audit the official injury report for April 8, 2026. Calculate the 'Vacant Usage' from absent players. "
+            "Who is the primary beneficiary of these missing shots/minutes? Detail how the team's 'Identity' (Pace/Style) "
+            "fundamentally shifts with the current personnel on the floor.\n\n"
+            "### 🧮 2. SYSTEMIC DISCREPANCY\n"
+            "The market valuation is {fd_p}. Cross-reference the subject's top 5% statistical strength against the "
+            "opponent's bottom 5% defensive vulnerability. Explain if the 'Math Edge' of {edge} is supported "
+            "by the current roster health or if it is a statistical anomaly (Trap).\n\n"
+            "### 🛡️ 3. RISK ALIGNMENT\n"
+            "Identify the single biggest variable that could invalidate the seasonal stats tonight (e.g., seeding motivation, "
+            "schedule fatigue, or specific personnel mismatches).\n\n"
+            "**FINAL SIGNAL:** 🟢 LOGIC ALIGNMENT (Math + Roster match), 🟡 VOLATILITY WARNING, or 🛑 SYSTEMIC RISK."
         )
     else:
         prompt = (
-            f"QUICK LOGISTICS SUMMARY: {matchup} ({sport}).\n"
-            "Return 3 bullet points. No intro. Max 30 words.\n"
-            "1. Personnel: Status of key staff.\n"
-            "2. Logistics: Primary shift in unit identity.\n"
-            "3. Outlook: 📈, ⚖️, or ⚠️."
+            f"QUICK ANATOMIC SCOUT: {matchup} ({sport}).\n"
+            "3 Bullets: 1. Vacant Usage 2. Primary Beneficiary 3. Signal (🟢, 🟡, or 🛑)."
         )
     
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.3, 
-            "maxOutputTokens": 1500
-        },
+        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 1000},
         "safetySettings": [
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"}
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}
         ]
     }
     
@@ -180,17 +173,15 @@ def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detai
         payload["tools"] = [{"google_search": {}}]
     
     try:
-        # 45s timeout to allow for search synthesis
-        res = requests.post(url, json=payload, timeout=45).json()
+        res = requests.post(url, json=payload, timeout=35).json()
         candidates = res.get('candidates', [])
         
-        if not candidates:
-            # Fallback text if a safety block still occurs
-            return "⚠️ Data currently localized. System is prioritizing Personnel Logistics reports. Please refresh."
+        if candidates:
+            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No analysis generated.')
         
-        return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No analysis generated.')
+        return "⚠️ Audit Signal Interrupted. Roster data currently high-variance."
     except Exception as e:
-        return f"⚠️ Audit Sync Error: {str(e)}"
+        return f"⚠️ Connection Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
