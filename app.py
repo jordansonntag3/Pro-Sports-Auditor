@@ -135,37 +135,44 @@ def auto_grade_ledger():
     return False
 
 def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # Using the production Gemini 3 Flash model
+    # Using the most stable production model for April 2026
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key={_key}"
     
-    # The absolute minimalist prompt to bypass all safety filters
+    # Minimalist prompt to avoid ALL triggers
     prompt = f"Can you get me a link to an ESPN article analyzing this game: {matchup}?"
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}],  # Required to fetch live URLs
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 200
-        }
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200}
     }
     
     try:
         response = requests.post(url, json=payload, timeout=30).json()
         
-        # Check for candidates (successful response)
+        # 1. Check for a successful response
         candidates = response.get('candidates', [])
         if candidates:
+            # Check if the model finished because of Safety
+            finish_reason = candidates[0].get('finishReason')
+            if finish_reason == "SAFETY":
+                return "❌ ACCOUNT LOCK: The Safety Filter blocked this output at the gate."
             return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No link found.')
             
-        # Check for safety blocks
+        # 2. Check for Prompt Blocks (Account-level restriction)
         if "promptFeedback" in response:
-            return f"❌ Blocked by Safety: {response['promptFeedback'].get('blockReason')}"
+            reason = response['promptFeedback'].get('blockReason')
+            return f"❌ ACCOUNT PROBLEM: Prompt blocked due to {reason}."
             
-        return "⚠️ Empty response from API. Check your Google Cloud console for billing/quota."
+        # 3. Check for Quota/Billing
+        if "error" in response:
+            error_msg = response['error'].get('message', 'Unknown error')
+            return f"❌ BILLING/QUOTA ERROR: {error_msg}"
+            
+        return "⚠️ EMPTY RESPONSE: This is likely a billing sync issue in Google AI Studio."
         
     except Exception as e:
-        return f"⚠️ Connection Error: {str(e)}"
+        return f"⚠️ SYSTEM ERROR: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
