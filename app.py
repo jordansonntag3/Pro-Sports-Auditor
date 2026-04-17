@@ -32,8 +32,11 @@ github_token = st.secrets.get("GITHUB_TOKEN")
 
 # --- UTILITIES ---
 
-def is_locked():
-    return time.time() < st.session_state.lock_until
+def get_btn_label(label):
+    if is_locked():
+        remaining = int(st.session_state.lock_until - time.time())
+        return f"⏳ {remaining}s" if remaining > 0 else label
+    return label
 
 def to_american(decimal):
     try:
@@ -167,13 +170,10 @@ st.title("💥 BANG! Button Value Scanner")
 
 # Cooldown Timer Display
 locked = is_locked()
-if locked:
-    timer_placeholder = st.empty()
-    remaining = int(st.session_state.lock_until - time.time())
-    if remaining > 0:
-        timer_placeholder.warning(f"⏳ API Cooldown: System ready in {remaining}s...")
-    else:
-        st.rerun()
+if is_locked():
+    # This prevents the "snap to top" by waiting for the script to finish
+    time.sleep(1)
+    st.rerun()
 
 # --- SIDEBAR ---
 with st.sidebar:
@@ -283,15 +283,15 @@ with tab1:
             c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
             
             ca, cb = st.columns(2)
-            if ca.button("📊 Analyst Opinions", key=f"t1_opin_{i}", disabled=locked, use_container_width=True):
-                st.session_state.lock_until = time.time() + 30
-                with st.spinner("Consulting sources..."):
+            if ca.button(get_btn_label("📊 Analyst Opinions"), key=f"t1_opin_{i}", disabled=locked, use_container_width=True):
+                st.session_state.lock_until = time.time() + 60 # Bumping to 60s for Quota safety
+                with st.spinner("Searching..."):
                     st.session_state[f"t1_res_{i}_opin"] = get_analyst_opinions(res['Matchup'], res['Sport'], res['Target'], price_str, gemini_key)
                 st.rerun()
-
-            if cb.button("🧮 Math Breakdown", key=f"t1_math_{i}", disabled=locked, use_container_width=True):
-                st.session_state.lock_until = time.time() + 30
-                with st.spinner("Analyzing personnel..."):
+            
+            if cb.button(get_btn_label("🧮 Math Breakdown"), key=f"t1_math_{i}", disabled=locked, use_container_width=True):
+                st.session_state.lock_until = time.time() + 60
+                with st.spinner("Calculating..."):
                     st.session_state[f"t1_res_{i}_math"] = get_math_breakdown(res['Matchup'], res['Sport'], res['Target'], price_str, gemini_key)
                 st.rerun()
 
