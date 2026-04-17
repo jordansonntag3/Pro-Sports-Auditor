@@ -131,9 +131,18 @@ def get_analyst_opinions(matchup, sport, target, fd_p, _key):
     )
     payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}}
     try:
-        res = requests.post(url, json=payload, timeout=50).json()
-        return res['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e: return f"⚠️ Error: {str(e)}"
+        response = requests.post(url, json=payload, timeout=50).json()
+        # 1. Check for Billing/Quota Errors
+        if "error" in response:
+            return f"❌ API ERROR: {response['error'].get('message', 'Unknown failure')}"
+        # 2. Check for Safety Blocks
+        if "candidates" not in response:
+            if "promptFeedback" in response:
+                return f"🛑 SAFETY BLOCK: {response['promptFeedback'].get('blockReason', 'Content Filtered')}"
+            return "⚠️ EMPTY RESPONSE: The API returned no data. Check your billing status."
+        # 3. Success
+        return response['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e: return f"⚠️ System Error: {str(e)}"
 
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
@@ -144,9 +153,13 @@ def get_math_breakdown(matchup, sport, target, fd_p, _key):
     )
     payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}}
     try:
-        res = requests.post(url, json=payload, timeout=50).json()
-        return res['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e: return f"⚠️ Error: {str(e)}"
+        response = requests.post(url, json=payload, timeout=50).json()
+        if "error" in response:
+            return f"❌ API ERROR: {response['error'].get('message')}"
+        if "candidates" not in response:
+            return "🛑 SAFETY BLOCK: The roster search data triggered a filter."
+        return response['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e: return f"⚠️ System Error: {str(e)}"
 
 # --- UI START ---
 
