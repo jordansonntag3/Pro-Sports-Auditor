@@ -315,11 +315,14 @@ with tab2:
                     if comm_c < now_c: continue 
                     all_intel.append({"Matchup": f"{game['away_team']} @ {game['home_team']}", "Target": game['away_team'], "Sport": name, "Start": comm_c.strftime('%I:%M %p')})
             except: continue
-        st.session_state.intel_results = all_intel; st.rerun()
+        st.session_state.intel_results = all_intel
+        st.rerun()
 
+    # Loop through the results
     for i, game in enumerate(st.session_state.intel_results):
         with st.container(border=True):
-            st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
+            st.subheader(game['Matchup'])
+            st.caption(f"🕒 {game['Start']} | {game['Sport']}")
             qa, qb = st.columns(2)
             
             if qa.button("📊 Analyst Opinions", key=f"t2_opin_{i}", disabled=locked, use_container_width=True):
@@ -334,9 +337,11 @@ with tab2:
                     st.session_state[f"t2_res_{i}_math"] = get_math_breakdown(game['Matchup'], game['Sport'], game['Target'], "N/A", gemini_key)
                 st.rerun()
 
-            # DISPLAY LOGIC MOVED INSIDE THE LOOP
-            if f"t2_res_{i}_opin" in st.session_state: st.info(st.session_state[f"t2_res_{i}_opin"])
-            if f"t2_res_{i}_math" in st.session_state: st.success(st.session_state[f"t2_res_{i}_math"])
+            # Display results INSIDE the loop so they appear under the correct game
+            if f"t2_res_{i}_opin" in st.session_state: 
+                st.info(st.session_state[f"t2_res_{i}_opin"])
+            if f"t2_res_{i}_math" in st.session_state: 
+                st.success(st.session_state[f"t2_res_{i}_math"])
 
 with tab3:
     st.header("📈 Performance Ledger")
