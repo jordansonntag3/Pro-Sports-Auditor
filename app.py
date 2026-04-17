@@ -128,27 +128,29 @@ def auto_grade_ledger():
 
 def get_analyst_opinions(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
-    prompt = (
-        f"ACT AS A SPORTS MARKET ANALYST. AUDIT THE MARKET CONSENSUS FOR: {matchup} ({sport}).\n"
-        f"BENCHMARK: {target} {fd_p}.\n"
-        "TASK: Search for 5 distinct sources (betting previews, sharp action trackers).\n"
-        "Create a Markdown table: **Source**, **Spread Stance**, **Primary Logic**.\n"
-        "End with '🏁 MARKET CONVERGENCE'."
-    )
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}}
+    
+    # The Full Search Prompt
+    payload_search = {
+        "contents": [{"parts": [{"text": f"ACT AS A SPORTS ANALYST. AUDIT MARKET CONSENSUS FOR: {matchup}. BENCHMARK: {target} {fd_p}."}]}],
+        "tools": [{"google_search": {}}], 
+        "generationConfig": {"temperature": 0.1}
+    }
+    
+    # The "No-Search" Fallback Prompt (Cheap on quota)
+    payload_no_search = {
+        "contents": [{"parts": [{"text": f"GIVE ME A PRELIMINARY PREVIEW FOR {matchup} BASED ON YOUR TRAINING DATA. BENCHMARK: {target} {fd_p}."}]}]
+    }
+
     try:
-        response = requests.post(url, json=payload, timeout=50).json()
-        # 1. Check for Billing/Quota Errors
-        if "error" in response:
-            return f"❌ API ERROR: {response['error'].get('message', 'Unknown failure')}"
-        # 2. Check for Safety Blocks
-        if "candidates" not in response:
-            if "promptFeedback" in response:
-                return f"🛑 SAFETY BLOCK: {response['promptFeedback'].get('blockReason', 'Content Filtered')}"
-            return "⚠️ EMPTY RESPONSE: The API returned no data. Check your billing status."
-        # 3. Success
-        return response['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e: return f"⚠️ System Error: {str(e)}"
+        # Try the expensive search first
+        res = requests.post(url, json=payload_search, timeout=50).json()
+        if "error" in res and "quota" in res["error"]["message"].lower():
+            # If search quota is hit, immediately fallback to local data
+            res = requests.post(url, json=payload_no_search, timeout=20).json()
+            return "⚠️ SEARCH QUOTA HIT: Falling back to local AI data...\n\n" + res['candidates'][0]['content']['parts'][0]['text']
+        return res['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e: 
+        return f"⚠️ System Error: {str(e)}"
 
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
