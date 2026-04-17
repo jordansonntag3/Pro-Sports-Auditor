@@ -168,13 +168,6 @@ def get_math_breakdown(matchup, sport, target, fd_p, _key):
 
 st.title("💥 BANG! Button Value Scanner")
 
-# Cooldown Timer Display
-locked = is_locked()
-if is_locked():
-    # This prevents the "snap to top" by waiting for the script to finish
-    time.sleep(1)
-    st.rerun()
-
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Command Center")
@@ -325,13 +318,13 @@ with tab2:
             st.caption(f"🕒 {game['Start']} | {game['Sport']}")
             qa, qb = st.columns(2)
             
-            if qa.button("📊 Analyst Opinions", key=f"t2_opin_{i}", disabled=locked, use_container_width=True):
+            if qa.button(get_btn_label("📊 Analyst Opinions"), key=f"t2_opin_{i}", disabled=locked, use_container_width=True):
                 st.session_state.lock_until = time.time() + 30
                 with st.spinner("Analyzing market..."):
                     st.session_state[f"t2_res_{i}_opin"] = get_analyst_opinions(game['Matchup'], game['Sport'], game['Target'], "N/A", gemini_key)
                 st.rerun()
             
-            if qb.button("🧮 Math Breakdown", key=f"t2_math_{i}", disabled=locked, use_container_width=True):
+            if qb.button(get_btn_label("🧮 Math Breakdown"), key=f"t2_math_{i}", disabled=locked, use_container_width=True):
                 st.session_state.lock_until = time.time() + 30
                 with st.spinner("Scouting personnel..."):
                     st.session_state[f"t2_res_{i}_math"] = get_math_breakdown(game['Matchup'], game['Sport'], game['Target'], "N/A", gemini_key)
@@ -363,3 +356,10 @@ with tab3:
         st.dataframe(df.iloc[::-1], use_container_width=True)
     else:
         st.warning("No bet history found. Hit 'Refresh GitHub' to pull your data.")
+
+# Cooldown Timer Display
+locked = is_locked()
+if is_locked():
+    # This prevents the "snap to top" by waiting for the script to finish
+    time.sleep(1)
+    st.rerun()
