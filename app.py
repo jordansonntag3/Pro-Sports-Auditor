@@ -12,6 +12,7 @@ import urllib.parse
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
 # 2. SESSION STATE INITIALIZATION
+if 'lock_until' not in st.session_state: st.session_state.lock_until = 0
 if "scan_results" not in st.session_state: st.session_state.scan_results = []
 if "intel_results" not in st.session_state: st.session_state.intel_results = []
 if "sent_alerts" not in st.session_state: st.session_state.sent_alerts = set()
@@ -30,6 +31,9 @@ discord_live_url = st.secrets.get("DISCORD_LIVE_URL")
 github_token = st.secrets.get("GITHUB_TOKEN")
 
 # --- UTILITIES ---
+
+def is_locked():
+    return time.time() < st.session_state.lock_until
 
 def to_american(decimal):
     try:
@@ -77,121 +81,87 @@ def sync_ledger():
     except: return False
 
 def auto_grade_ledger():
-    """Surgical Fix: Handles 'Arizona Wildcats' vs 'Arizona' and moves GitHub save outside the loop."""
     if not st.session_state.bet_history: return False
     df = pd.DataFrame(st.session_state.bet_history)
     pending_bets = df[df['Result'] == 'Pending']
     if pending_bets.empty: return False
 
-    # Expanded map to handle all 5 leagues
-    l_map_rev = {
-        "NBA": "basketball_nba", 
-        "NHL": "icehockey_nhl", 
-        "NCAA B": "basketball_ncaab",
-        "NFL": "americanfootball_nfl",
-        "NCAA F": "americanfootball_ncaaf"
-    }
+    l_map_rev = {"NBA": "basketball_nba", "NHL": "icehockey_nhl", "NCAA B": "basketball_ncaab", "NFL": "americanfootball_nfl", "NCAA F": "americanfootball_ncaaf"}
     updated = False
 
     for idx, row in pending_bets.iterrows():
         sport_key = l_map_rev.get(row['Sport'])
         if not sport_key: continue
         try:
-            # daysFrom=3 covers the Arizona game from yesterday perfectly
             scores = requests.get(f"https://api.the-odds-api.com/v4/sports/{sport_key}/scores/?apiKey={api_key}&daysFrom=3").json()
             for game in scores:
-                # FIX: Bi-directional matching (Arizona Wildcats matches Arizona)
                 game_teams = [game['home_team'].lower(), game['away_team'].lower()]
                 target_team = str(row['Team']).lower()
-                
-                # Check if ledger name is in API name OR API name is in ledger name
                 match_found = any(target_team in t or t in target_team for t in game_teams)
                 
                 if match_found and game.get('completed'):
                     h_score = next((s['score'] for s in game['scores'] if s['name'] == game['home_team']), 0)
                     a_score = next((s['score'] for s in game['scores'] if s['name'] == game['away_team']), 0)
-                    
                     is_home = any(target_team in t or t in target_team for t in [game['home_team'].lower()])
-                    target_s = int(h_score) if is_home else int(a_score)
-                    opp_s = int(a_score) if is_home else int(h_score)
-                    
-                    # SPREAD MATH: Handles '+' and float conversion
+                    target_s, opp_s = (int(h_score), int(a_score)) if is_home else (int(a_score), int(h_score))
                     line_val = float(str(row['Line']).replace('+', ''))
                     
                     if (target_s + line_val) > opp_s: df.at[idx, 'Result'] = "Win"
                     elif (target_s + line_val) < opp_s: df.at[idx, 'Result'] = "Loss"
                     else: df.at[idx, 'Result'] = "Push"
                     updated = True
-        except Exception as e:
-            st.error(f"Error grading {row['Team']}: {e}")
-            continue
+        except: continue
     
-    # SUCCESS: Move save outside the loop for stability
     if updated:
         if log_to_github_ledger(overwrite_df=df):
             st.session_state.bet_history = df.to_dict('records')
-            st.success("Ledger settled and pushed to GitHub!")
             return True
     return False
 
-# ENGINE 1: Market & Betting Consensus (No Win Stance)
+# --- GEMINI INTELLIGENCE ENGINES ---
+
 def get_analyst_opinions(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
-    
     prompt = (
-        f"ACT AS A SPORTS MARKET ANALYST. AUDIT THE MARKET CONSENSUS FOR: {matchup} ({sport}).\n\n"
-        f"BENCHMARK: The current spread for {target} is {fd_p}.\n"
-        "TASK: Search for 10 distinct sources including betting previews, consensus reports, and sharp action trackers.\n\n"
-        "INSTRUCTIONS:\n"
-        "1. Create a Markdown table with exactly three columns: **Source**, **Spread Stance**, and **Primary Logic**.\n"
-        "   - **Spread Stance**: (Agrees/Disagrees) Do they believe {target} covers the {fd_p} spread?\n"
-        "   - **Primary Logic**: A single sentence explaining the 'Sharp', 'Public', or analytical reasoning.\n"
-        "2. **CRITICAL**: DO NOT mention numeric betting lines in the table columns.\n"
-        "3. End with '🏁 MARKET CONVERGENCE' including the aggregate Spread Stance count (e.g., 'Spread Agrees: 7/10')."
+        f"ACT AS A SPORTS MARKET ANALYST. AUDIT THE MARKET CONSENSUS FOR: {matchup} ({sport}).\n"
+        f"BENCHMARK: {target} {fd_p}.\n"
+        "TASK: Search for 10 distinct sources (betting previews, sharp action trackers).\n"
+        "Create a Markdown table: **Source**, **Spread Stance**, **Primary Logic**.\n"
+        "End with '🏁 MARKET CONVERGENCE'."
     )
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}],
-        "generationConfig": {"temperature": 0.1},
-        "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
-    }
-    
+    payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}}
     try:
         res = requests.post(url, json=payload, timeout=50).json()
         return res['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        return f"⚠️ Market Audit Error: {str(e)}"
+    except Exception as e: return f"⚠️ Error: {str(e)}"
 
-# ENGINE 2: Personnel & Usage Breakdown
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
-    
     prompt = (
-        f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n\n"
-        f"BENCHMARK: The current valuation for {target} is {fd_p}.\n"
-        "OUTPUT FORMAT (Markdown):\n\n"
-        "### 🏥 Roster Health & Fatigue\n"
-        "Detail who is out, resting, or tired. Calculate the 'Usage Vacuum' (minutes/stats lost).\n\n"
-        "### ⚖️ The Mismatch Verdict\n"
-        "Analysis of exactly why the line discrepancy exists based on today's news. Compare the personnel to the BENCHMARK.\n\n"
-        "### 🏁 Final Intelligence Action\n"
-        "Conclude with: 🟢 PLAY or 🛑 HARD PASS."
+        f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n"
+        f"BENCHMARK: {target} {fd_p}.\n"
+        "OUTPUT: ### 🏥 Roster Health & Fatigue, ### ⚖️ The Mismatch Verdict, ### 🏁 Final Intelligence Action (🟢 PLAY or 🛑 HARD PASS)."
     )
-
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "tools": [{"google_search": {}}],
-        "generationConfig": {"temperature": 0.1},
-        "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
-    }
-    
+    payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}}
     try:
         res = requests.post(url, json=payload, timeout=50).json()
         return res['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e:
-        return f"⚠️ Math Breakdown Error: {str(e)}"
-        
+    except Exception as e: return f"⚠️ Error: {str(e)}"
+
+# --- UI START ---
+
+st.title("💥 BANG! Button Value Scanner")
+
+# Cooldown Timer Display
+locked = is_locked()
+if locked:
+    timer_placeholder = st.empty()
+    remaining = int(st.session_state.lock_until - time.time())
+    if remaining > 0:
+        timer_placeholder.warning(f"⏳ API Cooldown: System ready in {remaining}s...")
+    else:
+        st.rerun()
+
 # --- SIDEBAR ---
 with st.sidebar:
     st.header("⚙️ Command Center")
@@ -205,7 +175,7 @@ with st.sidebar:
 
 if time.time() - st.session_state.last_sync > 60: sync_ledger()
 
-# --- MAIN UI ---
+# --- MAIN TABS ---
 tab1, tab2, tab3 = st.tabs(["🚀 Strategic Scanner", "🧠 Intel Scout", "📊 Performance Ledger"])
 
 with tab1:
@@ -227,99 +197,97 @@ with tab1:
             if active: selected_leagues.append(league)
 
     if st.button("🚀 RUN SCAN", use_container_width=True):
-            new_res, discord_msg_list, now_c = [], [], datetime.now(pytz.timezone('US/Central'))
-            today_str = now_c.strftime("%m/%d/%Y")
-            
-            if horizon == "Today": max_time = now_c.replace(hour=23, minute=59, second=59)
-            elif horizon == "Tomorrow": max_time = (now_c + timedelta(days=1)).replace(hour=23, minute=59, second=59)
-            else: max_time = now_c + timedelta(hours=48)
-            
-            audit = {"Total": 0, "Time": 0, "Missing": 0, "Math": 0, "Hits": 0}
-    
-            # --- LEAGUE LOOP ---
-            for name in selected_leagues:
-                s_key, mkt = l_map[name]
-                try:
-                    data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
-                    for game in data:
-                        audit["Total"] += 1
-                        comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
-                        if comm_c < now_c or comm_c > max_time: 
-                            audit["Time"] += 1
-                            continue
-                        
-                        fd_a, pin_a, fd_h, pin_h = None, None, None, None
-                        for b in game.get('bookmakers', []):
-                            mkts = b.get('markets', [{}])[0].get('outcomes', [])
-                            for o in mkts:
-                                v = o.get('point') if mkt == 'spreads' else o.get('price')
-                                if o['name'] == game['away_team']:
-                                    if b['key'] == 'fanduel': fd_a = v
-                                    elif b['key'] == 'pinnacle': pin_a = v
-                                elif o['name'] == game['home_team']:
-                                    if b['key'] == 'fanduel': fd_h = v
-                                    elif b['key'] == 'pinnacle': pin_h = v
-                        
-                        if any(v is None for v in [fd_a, pin_a, fd_h, pin_h]): 
-                            audit["Missing"] += 1
-                            continue
-                            
-                        edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
-                        if mkt == 'h2h': edge_a, edge_h = edge_a * 100, edge_h * 100
-                        floor = (min_ml_edge if mkt == 'h2h' else min_pt_edge) - 0.01
-                        
-                        if edge_a >= floor or edge_h >= floor:
-                            audit["Hits"] += 1
-                            t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
-                            
-                            if discord_live_url and not mute_alerts and f"{t_team}_{today_str}" not in st.session_state.sent_alerts:
-                                line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
-                                scout_url = make_scout_link(f"{game['away_team']} @ {game['home_team']}", name)
-                                discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n[🔎 **SCOUTING**](<{scout_url}>)")
-                                st.session_state.sent_alerts.add(f"{t_team}_{today_str}")
-                            
-                            new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%I:%M %p')})
-                        else:
-                            audit["Math"] += 1
-                except: continue
-    
-            # --- THE CLEANUP (NOW OUTSIDE THE LEAGUE LOOP) ---
-            st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
-            st.session_state.audit_data = audit
+        new_res, discord_msg_list, now_c = [], [], datetime.now(pytz.timezone('US/Central'))
+        today_str = now_c.strftime("%m/%d/%Y")
+        if horizon == "Today": max_time = now_c.replace(hour=23, minute=59, second=59)
+        elif horizon == "Tomorrow": max_time = (now_c + timedelta(days=1)).replace(hour=23, minute=59, second=59)
+        else: max_time = now_c + timedelta(hours=48)
         
-            if discord_msg_list:
-                requests.post(discord_live_url, json={"content": "**💥 LIVE VALUE FEED**\n" + "\n".join(discord_msg_list)})
-            
-            st.rerun()
+        audit = {"Total": 0, "Time": 0, "Missing": 0, "Math": 0, "Hits": 0}
 
-        # AUDIT BAR (MOVED RIGHT TO STAY IN TAB 1)
+        for name in selected_leagues:
+            s_key, mkt = l_map[name]
+            try:
+                data = requests.get(f"https://api.the-odds-api.com/v4/sports/{s_key}/odds/", params={"apiKey": api_key, "regions": "us,eu", "markets": mkt, "bookmakers": "fanduel,pinnacle"}).json()
+                for game in data:
+                    audit["Total"] += 1
+                    comm_c = pd.to_datetime(game['commence_time']).tz_convert('UTC').astimezone(pytz.timezone('US/Central'))
+                    if comm_c < now_c or comm_c > max_time: 
+                        audit["Time"] += 1; continue
+                    
+                    fd_a, pin_a, fd_h, pin_h = None, None, None, None
+                    for b in game.get('bookmakers', []):
+                        mkts = b.get('markets', [{}])[0].get('outcomes', [])
+                        for o in mkts:
+                            v = o.get('point') if mkt == 'spreads' else o.get('price')
+                            if o['name'] == game['away_team']:
+                                if b['key'] == 'fanduel': fd_a = v
+                                elif b['key'] == 'pinnacle': pin_a = v
+                            elif o['name'] == game['home_team']:
+                                if b['key'] == 'fanduel': fd_h = v
+                                elif b['key'] == 'pinnacle': pin_h = v
+                    
+                    if any(v is None for v in [fd_a, pin_a, fd_h, pin_h]): 
+                        audit["Missing"] += 1; continue
+                        
+                    edge_a, edge_h = (fd_a - pin_a), (fd_h - pin_h)
+                    if mkt == 'h2h': edge_a, edge_h = edge_a * 100, edge_h * 100
+                    floor = (min_ml_edge if mkt == 'h2h' else min_pt_edge) - 0.01
+                    
+                    if edge_a >= floor or edge_h >= floor:
+                        audit["Hits"] += 1
+                        t_team, edge, price, pin_p = (game['away_team'], edge_a, fd_a, pin_a) if edge_a >= edge_h else (game['home_team'], edge_h, fd_h, pin_h)
+                        if discord_live_url and not mute_alerts and f"{t_team}_{today_str}" not in st.session_state.sent_alerts:
+                            line_str = to_american(price) if mkt == 'h2h' else f"{'+' if price > 0 else ''}{price}"
+                            scout_url = make_scout_link(f"{game['away_team']} @ {game['home_team']}", name)
+                            discord_msg_list.append(f"**{name} | {t_team} ({line_str})** vs PIN {pin_p}\n[🔎 **SCOUTING**](<{scout_url}>)")
+                            st.session_state.sent_alerts.add(f"{t_team}_{today_str}")
+                        new_res.append({"Target": t_team, "Sport": name, "Market": mkt, "FD": price, "PIN": pin_p, "Edge": edge, "Matchup": f"{game['away_team']} @ {game['home_team']}", "Start": comm_c.strftime('%I:%M %p')})
+                    else: audit["Math"] += 1
+            except: continue
+
+        st.session_state.scan_results = sorted(new_res, key=lambda x: x['Edge'], reverse=True)
+        st.session_state.audit_data = audit
+        if discord_msg_list:
+            requests.post(discord_live_url, json={"content": "**💥 LIVE VALUE FEED**\n" + "\n".join(discord_msg_list)})
+        st.rerun()
+
     if st.session_state.get("audit_data"):
-            a = st.session_state.audit_data
-            with st.container(border=True):
-                cols = st.columns(5)
-                cols[0].metric("Total Scanned", a.get('Total', 0))
-                cols[1].metric("Out of Window", a.get('Time', 0))
-                cols[2].metric("Missing Line", a.get('Missing', 0))
-                cols[3].metric("No Math Edge", a.get('Math', 0))
-                cols[4].metric("Value Hits", a.get('Hits', 0))
+        a = st.session_state.audit_data
+        with st.container(border=True):
+            cols = st.columns(5)
+            cols[0].metric("Total Scanned", a.get('Total', 0))
+            cols[1].metric("Out of Window", a.get('Time', 0))
+            cols[2].metric("Missing Line", a.get('Missing', 0))
+            cols[3].metric("No Math Edge", a.get('Math', 0))
+            cols[4].metric("Value Hits", a.get('Hits', 0))
 
-        # RESULT CARDS (MOVED RIGHT TO STAY IN TAB 1)
     for i, res in enumerate(st.session_state.scan_results):
-            with st.container(border=True):
-                price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
-                st.subheader(f"{res['Target']} ({price_str})")
-                st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
-                c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
-                ca, cb = st.columns(2)
-                if ca.button(f"⚡ Quick Intel", key=f"t1q_{res['Matchup']}_{i}", use_container_width=True):
-                    st.session_state[f"iq_{res['Matchup']}_{i}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="quick")
-                if cb.button(f"🔎 Detailed Intel", key=f"t1d_{res['Matchup']}_{i}", use_container_width=True):
-                    st.session_state[f"id_{res['Matchup']}_{i}"] = get_master_intel(res['Matchup'], res['Sport'], res['Target'], price_str, res['Edge'], gemini_key, grounding_mode, type="detailed")
-                if f"iq_{res['Matchup']}_{i}" in st.session_state: st.info(st.session_state[f"iq_{res['Matchup']}_{i}"])
-                if f"id_{res['Matchup']}_{i}" in st.session_state: st.success(st.session_state[f"id_{res['Matchup']}_{i}"])
-                if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{i}", type="primary", use_container_width=True):
-                    log_to_github_ledger({"Date": datetime.now().strftime("%m/%d/%Y"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
-                    st.toast("Logged!"); st.rerun()
+        with st.container(border=True):
+            price_str = to_american(res['FD']) if res['Market'] == 'h2h' else f"{'+' if res['FD'] > 0 else ''}{res['FD']}"
+            st.subheader(f"{res['Target']} ({price_str})")
+            st.caption(f"🕒 {res['Start']} | {res['Matchup']} ({res['Sport']})")
+            c1, c2 = st.columns(2); c1.metric("Market Edge", f"{res['Edge']:.1f}"); c2.metric("Pinnacle", to_american(res['PIN']) if res['Market']=='h2h' else res['PIN'])
+            
+            ca, cb = st.columns(2)
+            if ca.button("📊 Analyst Opinions", key=f"t1_opin_{i}", disabled=locked, use_container_width=True):
+                st.session_state.lock_until = time.time() + 30
+                with st.spinner("Consulting sources..."):
+                    st.session_state[f"t1_res_{i}_opin"] = get_analyst_opinions(res['Matchup'], res['Sport'], res['Target'], price_str, gemini_key)
+                st.rerun()
+
+            if cb.button("🧮 Math Breakdown", key=f"t1_math_{i}", disabled=locked, use_container_width=True):
+                st.session_state.lock_until = time.time() + 30
+                with st.spinner("Analyzing personnel..."):
+                    st.session_state[f"t1_res_{i}_math"] = get_math_breakdown(res['Matchup'], res['Sport'], res['Target'], price_str, gemini_key)
+                st.rerun()
+
+            if f"t1_res_{i}_opin" in st.session_state: st.info(st.session_state[f"t1_res_{i}_opin"])
+            if f"t1_res_{i}_math" in st.session_state: st.success(st.session_state[f"t1_res_{i}_math"])
+            
+            if st.button(f"✅ LOG BET", key=f"t1l_{res['Matchup']}_{i}", type="primary", use_container_width=True):
+                log_to_github_ledger({"Date": datetime.now().strftime("%m/%d/%Y"), "Team": res['Target'], "Sport": res['Sport'], "Line": price_str, "Edge": f"{res['Edge']:.1f}", "Units": 1.0, "Result": "Pending"})
+                st.toast("Logged!"); st.rerun()
 
 with tab2:
     st.markdown("### 🧠 Master Scout Board")
@@ -340,42 +308,40 @@ with tab2:
         with st.container(border=True):
             st.subheader(game['Matchup']); st.caption(f"🕒 {game['Start']} | {game['Sport']}")
             qa, qb = st.columns(2)
-            if qa.button(f"⚡ Quick Intel", key=f"t2q_{game['Matchup']}_{game['Sport']}_{i}", use_container_width=True):
-                st.session_state[f"iq_{game['Matchup']}_{game['Sport']}_{i}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="quick")
-            if qb.button(f"🔎 Detailed Intel", key=f"t2d_{game['Matchup']}_{game['Sport']}_{i}", use_container_width=True):
-                st.session_state[f"id_{game['Matchup']}_{game['Sport']}_{i}"] = get_master_intel(game['Matchup'], game['Sport'], game['Target'], "N/A", 0.0, gemini_key, grounding_mode, type="detailed")
-            if f"iq_{game['Matchup']}_{game['Sport']}_{i}" in st.session_state: st.info(st.session_state[f"iq_{game['Matchup']}_{game['Sport']}_{i}"])
-            if f"id_{game['Matchup']}_{game['Sport']}_{i}" in st.session_state: st.success(st.session_state[f"id_{game['Matchup']}_{game['Sport']}_{i}"])
+            
+            if qa.button("📊 Analyst Opinions", key=f"t2_opin_{i}", disabled=locked, use_container_width=True):
+                st.session_state.lock_until = time.time() + 30
+                with st.spinner("Analyzing market..."):
+                    st.session_state[f"t2_res_{i}_opin"] = get_analyst_opinions(game['Matchup'], game['Sport'], game['Target'], "N/A", gemini_key)
+                st.rerun()
+            
+            if qb.button("🧮 Math Breakdown", key=f"t2_math_{i}", disabled=locked, use_container_width=True):
+                st.session_state.lock_until = time.time() + 30
+                with st.spinner("Scouting personnel..."):
+                    st.session_state[f"t2_res_{i}_math"] = get_math_breakdown(game['Matchup'], game['Sport'], game['Target'], "N/A", gemini_key)
+                st.rerun()
+
+            # DISPLAY LOGIC MOVED INSIDE THE LOOP
+            if f"t2_res_{i}_opin" in st.session_state: st.info(st.session_state[f"t2_res_{i}_opin"])
+            if f"t2_res_{i}_math" in st.session_state: st.success(st.session_state[f"t2_res_{i}_math"])
 
 with tab3:
     st.header("📈 Performance Ledger")
     c1, c2 = st.columns(2)
-    
-    # Combined Button Logic
     if c1.button("🔄 AUTO-SETTLE PENDING", use_container_width=True, type="primary"):
-        if auto_grade_ledger(): 
-            st.rerun()
-            
+        if auto_grade_ledger(): st.rerun()
     if c2.button("🔄 REFRESH GITHUB", use_container_width=True):
-        # We wrap this in a check to show the error if it fails
-        if sync_ledger(): 
-            st.rerun()
-        else:
-            st.error("🚨 Ledger Sync Failed! Check the sidebar for the specific error.")
+        if sync_ledger(): st.rerun()
 
-    # Table Display Logic
     if st.session_state.get('bet_history'):
         df = pd.DataFrame(st.session_state.bet_history)
         df.index = range(1, len(df) + 1)
-        
         with st.expander("📝 MANUAL GRADE (Hard Commit)", expanded=False):
             edited = st.data_editor(df.iloc[::-1], use_container_width=True)
             if st.button("💾 PUSH TO GITHUB"):
                 st.session_state.bet_history = edited.iloc[::-1].to_dict('records')
                 if log_to_github_ledger(overwrite_df=edited.iloc[::-1]): 
-                    st.success("Updated!")
-                    st.rerun()
-        
+                    st.success("Updated!"); st.rerun()
         st.dataframe(df.iloc[::-1], use_container_width=True)
     else:
         st.warning("No bet history found. Hit 'Refresh GitHub' to pull your data.")
