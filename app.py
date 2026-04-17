@@ -134,36 +134,63 @@ def auto_grade_ledger():
             return True
     return False
 
-def get_master_intel(matchup, sport, target, fd_p, edge, _key, mode, type="detailed"):
-    # FIX: Use the official preview string for the 3-series
-    # Alternative: use "gemini-2.5-flash" for the most stable experience
-    model_id = "gemini-3-flash-preview" 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_id}:generateContent?key={_key}"
+# ENGINE 1: Market & Betting Consensus (No Win Stance)
+def get_analyst_opinions(matchup, sport, target, fd_p, _key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
     
-    prompt = f"Can you get me a link to an ESPN article analyzing this game: {matchup}?"
+    prompt = (
+        f"ACT AS A SPORTS MARKET ANALYST. AUDIT THE MARKET CONSENSUS FOR: {matchup} ({sport}).\n\n"
+        f"BENCHMARK: The current spread for {target} is {fd_p}.\n"
+        "TASK: Search for 10 distinct sources including betting previews, consensus reports, and sharp action trackers.\n\n"
+        "INSTRUCTIONS:\n"
+        "1. Create a Markdown table with exactly three columns: **Source**, **Spread Stance**, and **Primary Logic**.\n"
+        "   - **Spread Stance**: (Agrees/Disagrees) Do they believe {target} covers the {fd_p} spread?\n"
+        "   - **Primary Logic**: A single sentence explaining the 'Sharp', 'Public', or analytical reasoning.\n"
+        "2. **CRITICAL**: DO NOT mention numeric betting lines in the table columns.\n"
+        "3. End with '🏁 MARKET CONVERGENCE' including the aggregate Spread Stance count (e.g., 'Spread Agrees: 7/10')."
+    )
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "tools": [{"google_search": {}}],
-        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 200}
+        "generationConfig": {"temperature": 0.1},
+        "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
     }
     
     try:
-        response = requests.post(url, json=payload, timeout=30).json()
-        
-        # Check for successful response
-        candidates = response.get('candidates', [])
-        if candidates:
-            return candidates[0].get('content', {}).get('parts', [{}])[0].get('text', 'No link found.')
-            
-        # Handle 404/Not Found specifically
-        if "error" in response and response['error'].get('code') == 404:
-            return "❌ MODEL NAME ERROR: Use 'gemini-3-flash-preview' or 'gemini-2.5-flash'."
-            
-        return f"⚠️ API Error: {response.get('error', {}).get('message', 'Unknown failure')}"
-        
+        res = requests.post(url, json=payload, timeout=50).json()
+        return res['candidates'][0]['content']['parts'][0]['text']
     except Exception as e:
-        return f"⚠️ Connection Error: {str(e)}"
+        return f"⚠️ Market Audit Error: {str(e)}"
+
+# ENGINE 2: Personnel & Usage Breakdown
+def get_math_breakdown(matchup, sport, target, fd_p, _key):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
+    
+    prompt = (
+        f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n\n"
+        f"BENCHMARK: The current valuation for {target} is {fd_p}.\n"
+        "OUTPUT FORMAT (Markdown):\n\n"
+        "### 🏥 Roster Health & Fatigue\n"
+        "Detail who is out, resting, or tired. Calculate the 'Usage Vacuum' (minutes/stats lost).\n\n"
+        "### ⚖️ The Mismatch Verdict\n"
+        "Analysis of exactly why the line discrepancy exists based on today's news. Compare the personnel to the BENCHMARK.\n\n"
+        "### 🏁 Final Intelligence Action\n"
+        "Conclude with: 🟢 PLAY or 🛑 HARD PASS."
+    )
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "tools": [{"google_search": {}}],
+        "generationConfig": {"temperature": 0.1},
+        "safetySettings": [{"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"}]
+    }
+    
+    try:
+        res = requests.post(url, json=payload, timeout=50).json()
+        return res['candidates'][0]['content']['parts'][0]['text']
+    except Exception as e:
+        return f"⚠️ Math Breakdown Error: {str(e)}"
         
 # --- SIDEBAR ---
 with st.sidebar:
