@@ -125,7 +125,7 @@ def get_analyst_opinions(matchup, sport, target, fd_p, _key):
     prompt = (
         f"ACT AS A SPORTS MARKET ANALYST. AUDIT THE MARKET CONSENSUS FOR: {matchup} ({sport}).\n"
         f"BENCHMARK: {target} {fd_p}.\n"
-        "TASK: Search for 10 distinct sources (betting previews, sharp action trackers).\n"
+        "TASK: Search for 5 distinct sources (betting previews, sharp action trackers).\n"
         "Create a Markdown table: **Source**, **Spread Stance**, **Primary Logic**.\n"
         "End with '🏁 MARKET CONVERGENCE'."
     )
