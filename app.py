@@ -129,45 +129,45 @@ def auto_grade_ledger():
 def get_analyst_opinions(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
     
-    # The Full Search Prompt
-    payload_search = {
-        "contents": [{"parts": [{"text": f"ACT AS A SPORTS ANALYST. AUDIT MARKET CONSENSUS FOR: {matchup}. BENCHMARK: {target} {fd_p}."}]}],
+    # Payload A: Live Search (Increased patience to 15s)
+    p_search = {
+        "contents": [{"parts": [{"text": (
+            f"ACT AS A SPORTS ANALYST. AUDIT MARKET CONSENSUS FOR: {matchup} ({sport}).\n"
+            f"BENCHMARK: {target} {fd_p}.\n"
+            "INSTRUCTIONS: Summarize sharp vs public action and injury impact. "
+            "Use a clean Markdown format with a clear verdict."
+        )}]}],
         "tools": [{"google_search": {}}], 
         "generationConfig": {"temperature": 0.1}
     }
     
-    # The "No-Search" Fallback Prompt (Cheap on quota)
-    payload_no_search = {
-        "contents": [{"parts": [{"text": f"GIVE ME A PRELIMINARY PREVIEW FOR {matchup} BASED ON YOUR TRAINING DATA. BENCHMARK: {target} {fd_p}."}]}]
+    # Payload B: Fast Fallback (No search)
+    p_fast = {
+        "contents": [{"parts": [{"text": f"GIVE ME A SCOUTING PREVIEW FOR {matchup} BASED ON SEASONAL TRENDS. BENCHMARK: {target} {fd_p}."}]}]
     }
 
     try:
-        # Try the expensive search first
-        res = requests.post(url, json=payload_search, timeout=50).json()
-        if "error" in res and "quota" in res["error"]["message"].lower():
-            # If search quota is hit, immediately fallback to local data
-            res = requests.post(url, json=payload_no_search, timeout=20).json()
-            return "⚠️ SEARCH QUOTA HIT: Falling back to local AI data...\n\n" + res['candidates'][0]['content']['parts'][0]['text']
+        # Give the search 15 seconds to catch live data
+        res = requests.post(url, json=p_search, timeout=15).json()
+        if "error" in res:
+            res = requests.post(url, json=p_fast, timeout=15).json()
+            return "💡 (Offline Data) " + res['candidates'][0]['content']['parts'][0]['text']
         return res['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e: 
-        return f"⚠️ System Error: {str(e)}"
+    except Exception:
+        try:
+            res = requests.post(url, json=p_fast, timeout=15).json()
+            return "💡 (Offline Data) " + res['candidates'][0]['content']['parts'][0]['text']
+        except: return "⚠️ System is fully offline. Check connection."
 
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
-    prompt = (
-        f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n"
-        f"BENCHMARK: {target} {fd_p}.\n"
-        "OUTPUT: ### 🏥 Roster Health & Fatigue, ### ⚖️ The Mismatch Verdict, ### 🏁 Final Intelligence Action (🟢 PLAY or 🛑 HARD PASS)."
-    )
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "tools": [{"google_search": {}}], "generationConfig": {"temperature": 0.1}}
+    prompt = f"ACT AS A PERSONNEL SCOUT. AUDIT: {matchup}. BENCHMARK: {target} {fd_p}. OUTPUT: Roster Health, Mismatch Verdict, and Final Action."
+    
     try:
-        response = requests.post(url, json=payload, timeout=50).json()
-        if "error" in response:
-            return f"❌ API ERROR: {response['error'].get('message')}"
-        if "candidates" not in response:
-            return "🛑 SAFETY BLOCK: The roster search data triggered a filter."
-        return response['candidates'][0]['content']['parts'][0]['text']
-    except Exception as e: return f"⚠️ System Error: {str(e)}"
+        # Standard personnel breakdown
+        res = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15).json()
+        return res['candidates'][0]['content']['parts'][0]['text']
+    except: return "⚠️ Personnel data currently unavailable."
 
 # --- UI START ---
 
