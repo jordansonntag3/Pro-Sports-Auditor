@@ -8,6 +8,9 @@ from io import StringIO
 import pytz
 import urllib.parse
 
+def is_locked():
+    return time.time() < st.session_state.lock_until
+
 # 1. PAGE CONFIGURATION
 st.set_page_config(page_title="BANG! Button", page_icon="💥", layout="wide")
 
@@ -167,6 +170,8 @@ def get_math_breakdown(matchup, sport, target, fd_p, _key):
 # --- UI START ---
 
 st.title("💥 BANG! Button Value Scanner")
+
+locked = is_locked()
 
 # --- SIDEBAR ---
 with st.sidebar:
