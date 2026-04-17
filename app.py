@@ -161,28 +161,34 @@ def get_analyst_opinions(matchup, sport, target, fd_p, _key):
 
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
-    prompt = (
-        f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n"
-        f"BENCHMARK: {target} {fd_p}.\n"
-        "OUTPUT: ### 🏥 Roster Health, ### ⚖️ Mismatch Verdict, ### 🏁 Action (🟢 PLAY or 🛑 PASS)."
-    )
     
+    # Payload A: The Full Scout Report
+    p_scout = {
+        "contents": [{"parts": [{"text": f"ACT AS A PERSONNEL SCOUT. AUDIT: {matchup}. BENCHMARK: {target} {fd_p}. OUTPUT: Roster Health, Mismatch Verdict, and Final Action."}]}],
+        "generationConfig": {"temperature": 0.1}
+    }
+    
+    # Payload B: The Emergency "Gut Check" (Fastest possible request)
+    p_gut = {
+        "contents": [{"parts": [{"text": f"Quick personnel gut check: {matchup}. Who has the roster edge and why? (Short, no fluff)"}]}]
+    }
+
     try:
-        res = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15).json()
-        
-        # 1. Check for the actual API error message
+        # Try the full report with a 10s cutoff
+        res = requests.post(url, json=p_scout, timeout=10).json()
         if "error" in res:
-            error_msg = res["error"].get("message", "Unknown Quota Issue")
-            return f"❌ API ERROR: {error_msg}"
-            
-        # 2. Check for safety filters
-        if "candidates" not in res:
-            return "🛑 SAFETY BLOCK: The AI refused to analyze this roster."
-            
+            # If quota hit, try the cheap/fast gut check
+            res = requests.post(url, json=p_gut, timeout=10).json()
+            return "💡 (Fast Gut Check) " + res['candidates'][0]['content']['parts'][0]['text']
         return res['candidates'][0]['content']['parts'][0]['text']
         
-    except Exception as e: 
-        return f"⚠️ System Error: {str(e)}"
+    except Exception:
+        # If it times out, immediately fire the gut check
+        try:
+            res = requests.post(url, json=p_gut, timeout=10).json()
+            return "💡 (Emergency Gut Check) " + res['candidates'][0]['content']['parts'][0]['text']
+        except:
+            return "⚠️ Personnel server is currently unresponsive. Quota likely exhausted."
 
 # --- UI START ---
 
