@@ -161,13 +161,28 @@ def get_analyst_opinions(matchup, sport, target, fd_p, _key):
 
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key={_key}"
-    prompt = f"ACT AS A PERSONNEL SCOUT. AUDIT: {matchup}. BENCHMARK: {target} {fd_p}. OUTPUT: Roster Health, Mismatch Verdict, and Final Action."
+    prompt = (
+        f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n"
+        f"BENCHMARK: {target} {fd_p}.\n"
+        "OUTPUT: ### 🏥 Roster Health, ### ⚖️ Mismatch Verdict, ### 🏁 Action (🟢 PLAY or 🛑 PASS)."
+    )
     
     try:
-        # Standard personnel breakdown
         res = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15).json()
+        
+        # 1. Check for the actual API error message
+        if "error" in res:
+            error_msg = res["error"].get("message", "Unknown Quota Issue")
+            return f"❌ API ERROR: {error_msg}"
+            
+        # 2. Check for safety filters
+        if "candidates" not in res:
+            return "🛑 SAFETY BLOCK: The AI refused to analyze this roster."
+            
         return res['candidates'][0]['content']['parts'][0]['text']
-    except: return "⚠️ Personnel data currently unavailable."
+        
+    except Exception as e: 
+        return f"⚠️ System Error: {str(e)}"
 
 # --- UI START ---
 
