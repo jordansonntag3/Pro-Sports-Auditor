@@ -121,7 +121,7 @@ def auto_grade_ledger():
 # --- GEMINI INTELLIGENCE ENGINES ---
 
 def get_analyst_opinions(matchup, sport, target, fd_p, _key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={_key}"
     prompt = (
         f"ACT AS A SPORTS MARKET ANALYST. AUDIT THE MARKET CONSENSUS FOR: {matchup} ({sport}).\n"
         f"BENCHMARK: {target} {fd_p}.\n"
@@ -145,7 +145,7 @@ def get_analyst_opinions(matchup, sport, target, fd_p, _key):
     except Exception as e: return f"⚠️ System Error: {str(e)}"
 
 def get_math_breakdown(matchup, sport, target, fd_p, _key):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={_key}"
     prompt = (
         f"ACT AS A PROFESSIONAL PERSONNEL SCOUT. AUDIT: {matchup} ({sport}).\n"
         f"BENCHMARK: {target} {fd_p}.\n"
