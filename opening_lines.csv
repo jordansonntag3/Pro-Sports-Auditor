@@ -1,111 +1,85 @@
 Team,Opening_Line,Recorded_At,Sport
-Boston Celtics,1.5,2026-10-15 12:23:58,basketball_nba
-Detroit Pistons,-1.5,2026-10-15 12:23:58,basketball_nba
-New York Knicks,-5.5,2026-10-15 12:23:58,basketball_nba
-Philadelphia 76ers,5.5,2026-10-15 12:23:58,basketball_nba
-Oklahoma City Thunder,2.5,2026-10-15 12:23:58,basketball_nba
-San Antonio Spurs,-2.5,2026-10-15 12:23:58,basketball_nba
-Milwaukee Bucks,6.5,2026-10-15 12:23:58,basketball_nba
-Washington Wizards,-6.5,2026-10-15 12:23:58,basketball_nba
-Atlanta Hawks,2.5,2026-10-15 12:23:58,basketball_nba
-Orlando Magic,-2.5,2026-10-15 12:23:58,basketball_nba
-Brooklyn Nets,2.5,2026-10-15 12:23:58,basketball_nba
-Charlotte Hornets,-2.5,2026-10-15 12:23:58,basketball_nba
-Chicago Bulls,8.5,2026-10-15 12:23:58,basketball_nba
-Toronto Raptors,-8.5,2026-10-15 12:23:58,basketball_nba
-Miami Heat,-1.5,2026-10-15 12:23:58,basketball_nba
-Minnesota Timberwolves,1.5,2026-10-15 12:23:58,basketball_nba
-Indiana Pacers,-3.5,2026-10-15 12:23:58,basketball_nba
-New Orleans Pelicans,3.5,2026-10-15 12:23:58,basketball_nba
-Memphis Grizzlies,1.5,2026-10-15 12:23:58,basketball_nba
-Utah Jazz,-1.5,2026-10-15 12:23:58,basketball_nba
-Dallas Mavericks,8.5,2026-10-15 12:23:58,basketball_nba
-Houston Rockets,-8.5,2026-10-15 12:23:58,basketball_nba
-Golden State Warriors,5.5,2026-10-15 12:23:58,basketball_nba
-Los Angeles Lakers,-5.5,2026-10-15 12:23:58,basketball_nba
-Phoenix Suns,3.5,2026-10-15 12:23:58,basketball_nba
-Portland Trail Blazers,-3.5,2026-10-15 12:23:58,basketball_nba
-Los Angeles Clippers,-4.5,2026-10-15 12:23:58,basketball_nba
-Sacramento Kings,4.5,2026-10-15 12:23:58,basketball_nba
-Cleveland Cavaliers,2.5,2026-10-15 12:23:58,basketball_nba
-Philadelphia 76ers,-2.5,2026-10-15 12:23:58,basketball_nba
-Denver Nuggets,8.5,2026-10-15 12:23:58,basketball_nba
-Oklahoma City Thunder,-8.5,2026-10-15 12:23:58,basketball_nba
-Denver Broncos,2.5,2026-10-15 12:23:58,americanfootball_nfl
-Seattle Seahawks,-2.5,2026-10-15 12:23:58,americanfootball_nfl
-Houston Texans,2.5,2026-10-15 12:23:58,americanfootball_nfl
-Jacksonville Jaguars,-2.5,2026-10-15 12:23:58,americanfootball_nfl
-Atlanta Falcons,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Chicago Bears,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-Baltimore Ravens,-5.5,2026-10-15 12:23:58,americanfootball_nfl
-Cleveland Browns,5.5,2026-10-15 12:23:58,americanfootball_nfl
-Carolina Panthers,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-Philadelphia Eagles,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Indianapolis Colts,-6.5,2026-10-15 12:23:58,americanfootball_nfl
-Tennessee Titans,6.5,2026-10-15 12:23:58,americanfootball_nfl
-New England Patriots,-7.5,2026-10-15 12:23:58,americanfootball_nfl
-New York Jets,7.5,2026-10-15 12:23:58,americanfootball_nfl
-New Orleans Saints,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-New York Giants,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Pittsburgh Steelers,-2.5,2026-10-15 12:23:58,americanfootball_nfl
-Tampa Bay Buccaneers,2.5,2026-10-15 12:23:58,americanfootball_nfl
-Arizona Cardinals,12.5,2026-10-15 12:23:58,americanfootball_nfl
-Los Angeles Rams,-12.5,2026-10-15 12:23:58,americanfootball_nfl
-Buffalo Bills,-5.5,2026-10-15 12:23:58,americanfootball_nfl
-Las Vegas Raiders,5.5,2026-10-15 12:23:58,americanfootball_nfl
-Kansas City Chiefs,-8.5,2026-10-15 12:23:58,americanfootball_nfl
-Los Angeles Chargers,8.5,2026-10-15 12:23:58,americanfootball_nfl
-Dallas Cowboys,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Green Bay Packers,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-San Francisco 49ers,-7.5,2026-10-15 12:23:58,americanfootball_nfl
-Washington Commanders,7.5,2026-10-15 12:23:58,americanfootball_nfl
-Chicago Bears,-2.5,2026-10-15 12:23:58,americanfootball_nfl
-New England Patriots,2.5,2026-10-15 12:23:58,americanfootball_nfl
-New Orleans Saints,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Pittsburgh Steelers,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-Atlanta Falcons,4.5,2026-10-15 12:23:58,americanfootball_nfl
-San Francisco 49ers,-4.5,2026-10-15 12:23:58,americanfootball_nfl
-Baltimore Ravens,-3.5,2026-10-15 12:23:58,americanfootball_nfl
-Cincinnati Bengals,3.5,2026-10-15 12:23:58,americanfootball_nfl
-Carolina Panthers,-2.5,2026-10-15 12:23:58,americanfootball_nfl
-Tampa Bay Buccaneers,2.5,2026-10-15 12:23:58,americanfootball_nfl
-Cleveland Browns,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-Tennessee Titans,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Houston Texans,-7.5,2026-10-15 12:23:58,americanfootball_nfl
-New York Giants,7.5,2026-10-15 12:23:58,americanfootball_nfl
-Indianapolis Colts,4.5,2026-10-15 12:23:58,americanfootball_nfl
-Minnesota Vikings,-4.5,2026-10-15 12:23:58,americanfootball_nfl
-Miami Dolphins,4.5,2026-10-15 12:23:58,americanfootball_nfl
-New York Jets,-4.5,2026-10-15 12:23:58,americanfootball_nfl
-Arizona Cardinals,4.5,2026-10-15 12:23:58,americanfootball_nfl
-Denver Broncos,-4.5,2026-10-15 12:23:58,americanfootball_nfl
-Detroit Lions,-3.5,2026-10-15 12:23:58,americanfootball_nfl
-Green Bay Packers,3.5,2026-10-15 12:23:58,americanfootball_nfl
-Las Vegas Raiders,6.5,2026-10-15 12:23:58,americanfootball_nfl
-Los Angeles Rams,-6.5,2026-10-15 12:23:58,americanfootball_nfl
-Kansas City Chiefs,2.5,2026-10-15 12:23:58,americanfootball_nfl
-Seattle Seahawks,-2.5,2026-10-15 12:23:58,americanfootball_nfl
-Dallas Cowboys,-1.5,2026-10-15 12:23:58,americanfootball_nfl
-Philadelphia Eagles,1.5,2026-10-15 12:23:58,americanfootball_nfl
-Buffalo Sabres,2.0,2026-10-15 12:23:58,icehockey_nhl
-Toronto Maple Leafs,1.83,2026-10-15 12:23:58,icehockey_nhl
-Florida Panthers,1.35,2026-10-15 12:23:58,icehockey_nhl
-Vancouver Canucks,3.3,2026-10-15 12:23:58,icehockey_nhl
-New Jersey Devils,1.69,2026-10-15 12:23:58,icehockey_nhl
-New York Rangers,2.2,2026-10-15 12:23:58,icehockey_nhl
-New York Islanders,2.32,2026-10-15 12:23:58,icehockey_nhl
-Ottawa Senators,1.62,2026-10-15 12:23:58,icehockey_nhl
-Seattle Kraken,3.1,2026-10-15 12:23:58,icehockey_nhl
-Tampa Bay Lightning,1.38,2026-10-15 12:23:58,icehockey_nhl
-Detroit Red Wings,1.73,2026-10-15 12:23:58,icehockey_nhl
-Philadelphia Flyers,2.14,2026-10-15 12:23:58,icehockey_nhl
-Chicago Blackhawks,2.05,2026-10-15 12:23:58,icehockey_nhl
-Winnipeg Jets,1.79,2026-10-15 12:23:58,icehockey_nhl
-Minnesota Wild,1.67,2026-10-15 12:23:58,icehockey_nhl
-St Louis Blues,2.25,2026-10-15 12:23:58,icehockey_nhl
-Nashville Predators,1.72,2026-10-15 12:23:58,icehockey_nhl
-San Jose Sharks,2.15,2026-10-15 12:23:58,icehockey_nhl
-Edmonton Oilers,1.79,2026-10-15 12:23:58,icehockey_nhl
-Utah Mammoth,2.05,2026-10-15 12:23:58,icehockey_nhl
-Calgary Flames,3.5,2026-10-15 12:23:58,icehockey_nhl
-Vegas Golden Knights,1.32,2026-10-15 12:23:58,icehockey_nhl
+Boston Celtics,1.5,2026-10-16 12:03:00,basketball_nba
+Detroit Pistons,-1.5,2026-10-16 12:03:00,basketball_nba
+New York Knicks,-5.5,2026-10-16 12:03:00,basketball_nba
+Philadelphia 76ers,5.5,2026-10-16 12:03:00,basketball_nba
+Oklahoma City Thunder,2.5,2026-10-16 12:03:00,basketball_nba
+San Antonio Spurs,-2.5,2026-10-16 12:03:00,basketball_nba
+Milwaukee Bucks,5.5,2026-10-16 12:03:00,basketball_nba
+Washington Wizards,-5.5,2026-10-16 12:03:00,basketball_nba
+Atlanta Hawks,2.5,2026-10-16 12:03:00,basketball_nba
+Orlando Magic,-2.5,2026-10-16 12:03:00,basketball_nba
+Brooklyn Nets,1.5,2026-10-16 12:03:00,basketball_nba
+Charlotte Hornets,-1.5,2026-10-16 12:03:00,basketball_nba
+Chicago Bulls,8.5,2026-10-16 12:03:00,basketball_nba
+Toronto Raptors,-8.5,2026-10-16 12:03:00,basketball_nba
+Miami Heat,-1.5,2026-10-16 12:03:00,basketball_nba
+Minnesota Timberwolves,1.5,2026-10-16 12:03:00,basketball_nba
+Indiana Pacers,-3.5,2026-10-16 12:03:00,basketball_nba
+New Orleans Pelicans,3.5,2026-10-16 12:03:00,basketball_nba
+Memphis Grizzlies,1.5,2026-10-16 12:03:00,basketball_nba
+Utah Jazz,-1.5,2026-10-16 12:03:00,basketball_nba
+Dallas Mavericks,8.5,2026-10-16 12:03:00,basketball_nba
+Houston Rockets,-8.5,2026-10-16 12:03:00,basketball_nba
+Golden State Warriors,5.5,2026-10-16 12:03:00,basketball_nba
+Los Angeles Lakers,-5.5,2026-10-16 12:03:00,basketball_nba
+Phoenix Suns,3.5,2026-10-16 12:03:00,basketball_nba
+Portland Trail Blazers,-3.5,2026-10-16 12:03:00,basketball_nba
+Los Angeles Clippers,-4.5,2026-10-16 12:03:00,basketball_nba
+Sacramento Kings,4.5,2026-10-16 12:03:00,basketball_nba
+Cleveland Cavaliers,2.5,2026-10-16 12:03:00,basketball_nba
+Philadelphia 76ers,-2.5,2026-10-16 12:03:00,basketball_nba
+Denver Nuggets,8.5,2026-10-16 12:03:00,basketball_nba
+Oklahoma City Thunder,-8.5,2026-10-16 12:03:00,basketball_nba
+Houston Texans,2.5,2026-10-16 12:03:00,americanfootball_nfl
+Jacksonville Jaguars,-2.5,2026-10-16 12:03:00,americanfootball_nfl
+Atlanta Falcons,1.5,2026-10-16 12:03:00,americanfootball_nfl
+Chicago Bears,-1.5,2026-10-16 12:03:00,americanfootball_nfl
+Baltimore Ravens,-3.5,2026-10-16 12:03:00,americanfootball_nfl
+Cleveland Browns,3.5,2026-10-16 12:03:00,americanfootball_nfl
+Carolina Panthers,-3.5,2026-10-16 12:03:00,americanfootball_nfl
+Philadelphia Eagles,3.5,2026-10-16 12:03:00,americanfootball_nfl
+Indianapolis Colts,-6.5,2026-10-16 12:03:00,americanfootball_nfl
+Tennessee Titans,6.5,2026-10-16 12:03:00,americanfootball_nfl
+New England Patriots,-7.5,2026-10-16 12:03:00,americanfootball_nfl
+New York Jets,7.5,2026-10-16 12:03:00,americanfootball_nfl
+New Orleans Saints,-1.5,2026-10-16 12:03:00,americanfootball_nfl
+New York Giants,1.5,2026-10-16 12:03:00,americanfootball_nfl
+Pittsburgh Steelers,-2.5,2026-10-16 12:03:00,americanfootball_nfl
+Tampa Bay Buccaneers,2.5,2026-10-16 12:03:00,americanfootball_nfl
+Arizona Cardinals,12.5,2026-10-16 12:03:00,americanfootball_nfl
+Los Angeles Rams,-12.5,2026-10-16 12:03:00,americanfootball_nfl
+Buffalo Bills,-5.5,2026-10-16 12:03:00,americanfootball_nfl
+Las Vegas Raiders,5.5,2026-10-16 12:03:00,americanfootball_nfl
+Kansas City Chiefs,-8.5,2026-10-16 12:03:00,americanfootball_nfl
+Los Angeles Chargers,8.5,2026-10-16 12:03:00,americanfootball_nfl
+Dallas Cowboys,1.5,2026-10-16 12:03:00,americanfootball_nfl
+Green Bay Packers,-1.5,2026-10-16 12:03:00,americanfootball_nfl
+San Francisco 49ers,-7.5,2026-10-16 12:03:00,americanfootball_nfl
+Washington Commanders,7.5,2026-10-16 12:03:00,americanfootball_nfl
+Chicago Bears,-2.5,2026-10-16 12:03:00,americanfootball_nfl
+New England Patriots,2.5,2026-10-16 12:03:00,americanfootball_nfl
+New Orleans Saints,1.5,2026-10-16 12:03:00,americanfootball_nfl
+Pittsburgh Steelers,-1.5,2026-10-16 12:03:00,americanfootball_nfl
+Atlanta Falcons,4.5,2026-10-16 12:03:00,americanfootball_nfl
+San Francisco 49ers,-4.5,2026-10-16 12:03:00,americanfootball_nfl
+Baltimore Ravens,-3.5,2026-10-16 12:03:00,americanfootball_nfl
+Cincinnati Bengals,3.5,2026-10-16 12:03:00,americanfootball_nfl
+Carolina Panthers,-2.5,2026-10-16 12:03:00,americanfootball_nfl
+Tampa Bay Buccaneers,2.5,2026-10-16 12:03:00,americanfootball_nfl
+Cleveland Browns,-1.5,2026-10-16 12:03:00,americanfootball_nfl
+Tennessee Titans,1.5,2026-10-16 12:03:00,americanfootball_nfl
+Houston Texans,-7.5,2026-10-16 12:03:00,americanfootball_nfl
+New York Giants,7.5,2026-10-16 12:03:00,americanfootball_nfl
+Indianapolis Colts,4.5,2026-10-16 12:03:00,americanfootball_nfl
+Minnesota Vikings,-4.5,2026-10-16 12:03:00,americanfootball_nfl
+Miami Dolphins,4.5,2026-10-16 12:03:00,americanfootball_nfl
+New York Jets,-4.5,2026-10-16 12:03:00,americanfootball_nfl
+Detroit Lions,-3.5,2026-10-16 12:03:00,americanfootball_nfl
+Green Bay Packers,3.5,2026-10-16 12:03:00,americanfootball_nfl
+Las Vegas Raiders,6.5,2026-10-16 12:03:00,americanfootball_nfl
+Los Angeles Rams,-6.5,2026-10-16 12:03:00,americanfootball_nfl
+Colorado Avalanche,1.47,2026-10-16 12:03:00,icehockey_nhl
+Pittsburgh Penguins,2.76,2026-10-16 12:03:00,icehockey_nhl
+Anaheim Ducks,1.96,2026-10-16 12:03:00,icehockey_nhl
+Boston Bruins,1.87,2026-10-16 12:03:00,icehockey_nhl
