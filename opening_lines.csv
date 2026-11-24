@@ -1,135 +1,229 @@
 Team,Opening_Line,Recorded_At,Sport
-Charlotte Hornets,2.5,2026-11-23 18:55:49,basketball_nba
-Memphis Grizzlies,-2.5,2026-11-23 18:55:49,basketball_nba
-Philadelphia 76ers,-2.5,2026-11-23 18:55:49,basketball_nba
-Portland Trail Blazers,2.5,2026-11-23 18:55:49,basketball_nba
-Brooklyn Nets,11.5,2026-11-23 18:55:49,basketball_nba
-Minnesota Timberwolves,-11.5,2026-11-23 18:55:49,basketball_nba
-Indiana Pacers,6.5,2026-11-23 18:55:49,basketball_nba
-Oklahoma City Thunder,-6.5,2026-11-23 18:55:49,basketball_nba
-Milwaukee Bucks,10.5,2026-11-23 18:55:49,basketball_nba
-Toronto Raptors,-10.5,2026-11-23 18:55:49,basketball_nba
-Chicago Bulls,8.5,2026-11-23 18:55:49,basketball_nba
-Cleveland Cavaliers,-8.5,2026-11-23 18:55:49,basketball_nba
-New Orleans Pelicans,2.5,2026-11-23 18:55:49,basketball_nba
-Phoenix Suns,-2.5,2026-11-23 18:55:49,basketball_nba
-Houston Rockets,-12.5,2026-11-23 18:55:49,basketball_nba
-Los Angeles Clippers,12.5,2026-11-23 18:55:49,basketball_nba
-Los Angeles Lakers,-13.5,2026-11-23 18:55:49,basketball_nba
-Utah Jazz,13.5,2026-11-23 18:55:49,basketball_nba
-Sacramento Kings,10.5,2026-11-23 18:55:49,basketball_nba
-San Antonio Spurs,-10.5,2026-11-23 18:55:49,basketball_nba
-East Carolina Pirates,-5.5,2026-11-23 18:55:49,basketball_ncaab
-Indiana St Sycamores,5.5,2026-11-23 18:55:49,basketball_ncaab
-Florida Int'l Golden Panthers,-6.5,2026-11-23 18:55:49,basketball_ncaab
-Long Beach St 49ers,6.5,2026-11-23 18:55:49,basketball_ncaab
-Akron Zips,3.5,2026-11-23 18:55:49,basketball_ncaab
-Wright St Raiders,-3.5,2026-11-23 18:55:49,basketball_ncaab
-Charlotte 49ers,-12.5,2026-11-23 18:55:49,basketball_ncaab
-Florida Gulf Coast Eagles,12.5,2026-11-23 18:55:49,basketball_ncaab
-Oregon St Beavers,-5.5,2026-11-23 18:55:49,basketball_ncaab
-Tulsa Golden Hurricane,5.5,2026-11-23 18:55:49,basketball_ncaab
-Clemson Tigers,5.5,2026-11-23 18:55:49,basketball_ncaab
-Ole Miss Rebels,-5.5,2026-11-23 18:55:49,basketball_ncaab
-Middle Tennessee Blue Raiders,3.5,2026-11-23 18:55:49,basketball_ncaab
-Southern Illinois Salukis,-3.5,2026-11-23 18:55:49,basketball_ncaab
-Arkansas St Red Wolves,-6.5,2026-11-23 18:55:49,basketball_ncaab
-Southern Utah Thunderbirds,6.5,2026-11-23 18:55:49,basketball_ncaab
-IUPUI Jaguars,5.5,2026-11-23 18:55:49,basketball_ncaab
-William & Mary Tribe,-5.5,2026-11-23 18:55:49,basketball_ncaab
-Belmont Bruins,-2.5,2026-11-23 18:55:49,basketball_ncaab
-Yale Bulldogs,2.5,2026-11-23 18:55:49,basketball_ncaab
-Georgia St Panthers,-1.5,2026-11-23 18:55:49,basketball_ncaab
-Tulane Green Wave,1.5,2026-11-23 18:55:49,basketball_ncaab
-Nevada Wolf Pack,-7.5,2026-11-23 18:55:49,basketball_ncaab
-San Francisco Dons,7.5,2026-11-23 18:55:49,basketball_ncaab
-BYU Cougars,-11.5,2026-11-23 18:55:49,basketball_ncaab
-Washington Huskies,11.5,2026-11-23 18:55:49,basketball_ncaab
-Temple Owls,-2.5,2026-11-23 18:55:49,basketball_ncaab
-Tenn-Martin Skyhawks,2.5,2026-11-23 18:55:49,basketball_ncaab
-Maryland-Eastern Shore Hawks,12.5,2026-11-23 18:55:49,basketball_ncaab
-Youngstown St Penguins,-12.5,2026-11-23 18:55:49,basketball_ncaab
-Central Arkansas Bears,-8.5,2026-11-23 18:55:49,basketball_ncaab
-North Florida Ospreys,8.5,2026-11-23 18:55:49,basketball_ncaab
-Fairleigh Dickinson Knights,9.5,2026-11-23 18:55:49,basketball_ncaab
-Iona Gaels,-9.5,2026-11-23 18:55:49,basketball_ncaab
-Georgia Southern Eagles,2.5,2026-11-23 18:55:49,basketball_ncaab
-Northern Kentucky Norse,-2.5,2026-11-23 18:55:49,basketball_ncaab
-Illinois St Redbirds,2.5,2026-11-23 18:55:49,basketball_ncaab
-Santa Clara Broncos,-2.5,2026-11-23 18:55:49,basketball_ncaab
-North Carolina A&T Aggies,-2.5,2026-11-23 18:55:49,basketball_ncaab
-South Carolina St Bulldogs,2.5,2026-11-23 18:55:49,basketball_ncaab
-Texas A&M-CC Islanders,19.5,2026-11-23 18:55:49,basketball_ncaab
-Wichita St Shockers,-19.5,2026-11-23 18:55:49,basketball_ncaab
-Denver Pioneers,32.5,2026-11-23 18:55:49,basketball_ncaab
-Kansas Jayhawks,-32.5,2026-11-23 18:55:49,basketball_ncaab
-Illinois Fighting Illini,-42.5,2026-11-23 18:55:49,basketball_ncaab
-Winthrop Eagles,42.5,2026-11-23 18:55:49,basketball_ncaab
-Monmouth Hawks,18.5,2026-11-23 18:55:49,basketball_ncaab
-North Carolina Tar Heels,-18.5,2026-11-23 18:55:49,basketball_ncaab
-Stephen F. Austin Lumberjacks,3.5,2026-11-23 18:55:49,basketball_ncaab
-Utah Valley Wolverines,-3.5,2026-11-23 18:55:49,basketball_ncaab
-Providence Friars,-1.5,2026-11-23 18:55:49,basketball_ncaab
-VCU Rams,1.5,2026-11-23 18:55:49,basketball_ncaab
-Loyola (Chi) Ramblers,1.5,2026-11-23 18:55:49,basketball_ncaab
-Seattle Redhawks,-1.5,2026-11-23 18:55:49,basketball_ncaab
-Pepperdine Waves,-10.5,2026-11-23 18:55:49,basketball_ncaab
-UNC Greensboro Spartans,10.5,2026-11-23 18:55:49,basketball_ncaab
-Alabama St Hornets,18.5,2026-11-23 18:55:49,basketball_ncaab
-California Golden Bears,-18.5,2026-11-23 18:55:49,basketball_ncaab
-Eastern Washington Eagles,7.5,2026-11-23 18:55:49,basketball_ncaab
-UNLV Rebels,-7.5,2026-11-23 18:55:49,basketball_ncaab
-Arizona Wildcats,-16.5,2026-11-23 18:55:49,basketball_ncaab
-Colorado St Rams,16.5,2026-11-23 18:55:49,basketball_ncaab
-San José St Spartans,1.5,2026-11-23 18:55:49,basketball_ncaab
-UC San Diego Tritons,-1.5,2026-11-23 18:55:49,basketball_ncaab
-Cincinnati Bengals,-5.5,2026-11-23 18:55:49,americanfootball_nfl
-Washington Commanders,5.5,2026-11-23 18:55:49,americanfootball_nfl
-Green Bay Packers,3.0,2026-11-23 18:55:49,americanfootball_nfl
-Los Angeles Rams,-3.0,2026-11-23 18:55:49,americanfootball_nfl
-Chicago Bears,-2.5,2026-11-23 18:55:49,americanfootball_nfl
-Detroit Lions,2.5,2026-11-23 18:55:49,americanfootball_nfl
-Dallas Cowboys,-8.5,2026-11-23 18:55:49,americanfootball_nfl
-Philadelphia Eagles,8.5,2026-11-23 18:55:49,americanfootball_nfl
-Buffalo Bills,-2.5,2026-11-23 18:55:49,americanfootball_nfl
-Kansas City Chiefs,2.5,2026-11-23 18:55:49,americanfootball_nfl
-Denver Broncos,-2.5,2026-11-23 18:55:49,americanfootball_nfl
-Pittsburgh Steelers,2.5,2026-11-23 18:55:49,americanfootball_nfl
-Atlanta Falcons,6.5,2026-11-23 18:55:49,americanfootball_nfl
-Minnesota Vikings,-6.5,2026-11-23 18:55:49,americanfootball_nfl
-Baltimore Ravens,6.5,2026-11-23 18:55:49,americanfootball_nfl
-Houston Texans,-6.5,2026-11-23 18:55:49,americanfootball_nfl
-Cincinnati Bengals,-10.5,2026-11-23 18:55:49,americanfootball_nfl
-New Orleans Saints,10.5,2026-11-23 18:55:49,americanfootball_nfl
-Indianapolis Colts,7.0,2026-11-23 18:55:49,americanfootball_nfl
-New York Giants,-7.0,2026-11-23 18:55:49,americanfootball_nfl
-Jacksonville Jaguars,-14.5,2026-11-23 18:55:49,americanfootball_nfl
-Tennessee Titans,14.5,2026-11-23 18:55:49,americanfootball_nfl
-Miami Dolphins,3.5,2026-11-23 18:55:49,americanfootball_nfl
-New York Jets,-3.5,2026-11-23 18:55:49,americanfootball_nfl
-Los Angeles Chargers,-1.5,2026-11-23 18:55:49,americanfootball_nfl
-New England Patriots,1.5,2026-11-23 18:55:49,americanfootball_nfl
-Arizona Cardinals,7.0,2026-11-23 18:55:49,americanfootball_nfl
-Washington Commanders,-7.0,2026-11-23 18:55:49,americanfootball_nfl
-San Francisco 49ers,-3.0,2026-11-23 18:55:49,americanfootball_nfl
-Seattle Seahawks,3.0,2026-11-23 18:55:49,americanfootball_nfl
-Cleveland Browns,-4.5,2026-11-23 18:55:49,americanfootball_nfl
-Las Vegas Raiders,4.5,2026-11-23 18:55:49,americanfootball_nfl
-Carolina Panthers,3.0,2026-11-23 18:55:49,americanfootball_nfl
-Tampa Bay Buccaneers,-3.0,2026-11-23 18:55:49,americanfootball_nfl
-Columbus Blue Jackets,2.68,2026-11-23 18:55:49,icehockey_nhl
-New Jersey Devils,1.49,2026-11-23 18:55:49,icehockey_nhl
-Calgary Flames,3.05,2026-11-23 18:55:49,icehockey_nhl
-Ottawa Senators,1.39,2026-11-23 18:55:49,icehockey_nhl
-Los Angeles Kings,2.3,2026-11-23 18:55:49,icehockey_nhl
-Montréal Canadiens,1.64,2026-11-23 18:55:49,icehockey_nhl
-New York Islanders,1.61,2026-11-23 18:55:49,icehockey_nhl
-Toronto Maple Leafs,2.36,2026-11-23 18:55:49,icehockey_nhl
-Utah Mammoth,1.91,2026-11-23 18:55:49,icehockey_nhl
-Winnipeg Jets,1.91,2026-11-23 18:55:49,icehockey_nhl
-Anaheim Ducks,1.98,2026-11-23 18:55:49,icehockey_nhl
-Seattle Kraken,1.85,2026-11-23 18:55:49,icehockey_nhl
-Minnesota Wild,1.54,2026-11-23 18:55:49,icehockey_nhl
-San Jose Sharks,2.52,2026-11-23 18:55:49,icehockey_nhl
-Edmonton Oilers,1.96,2026-11-23 18:55:49,icehockey_nhl
-Vegas Golden Knights,1.87,2026-11-23 18:55:49,icehockey_nhl
+Detroit Pistons,-2.5,2026-11-24 18:34:29,basketball_nba
+Orlando Magic,2.5,2026-11-24 18:34:29,basketball_nba
+Boston Celtics,-10.5,2026-11-24 18:34:29,basketball_nba
+Washington Wizards,10.5,2026-11-24 18:34:29,basketball_nba
+Dallas Mavericks,8.5,2026-11-24 18:34:29,basketball_nba
+Denver Nuggets,-8.5,2026-11-24 18:34:29,basketball_nba
+Miami Heat,2.5,2026-11-24 18:34:29,basketball_nba
+Philadelphia 76ers,-2.5,2026-11-24 18:34:29,basketball_nba
+Cleveland Cavaliers,5.5,2026-11-24 18:34:29,basketball_nba
+New York Knicks,-5.5,2026-11-24 18:34:29,basketball_nba
+Minnesota Timberwolves,2.5,2026-11-24 18:34:29,basketball_nba
+Oklahoma City Thunder,-2.5,2026-11-24 18:34:29,basketball_nba
+Houston Rockets,-9.5,2026-11-24 18:34:29,basketball_nba
+Phoenix Suns,9.5,2026-11-24 18:34:29,basketball_nba
+N Colorado Bears,-1.5,2026-11-24 18:34:29,basketball_ncaab
+SE Louisiana Lions,1.5,2026-11-24 18:34:29,basketball_ncaab
+Akron Zips,-10.5,2026-11-24 18:34:29,basketball_ncaab
+Belmont Bruins,10.5,2026-11-24 18:34:29,basketball_ncaab
+Florida Int'l Golden Panthers,-4.5,2026-11-24 18:34:29,basketball_ncaab
+Southern Utah Thunderbirds,4.5,2026-11-24 18:34:29,basketball_ncaab
+Oklahoma Sooners,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Pittsburgh Panthers,1.5,2026-11-24 18:34:29,basketball_ncaab
+Rice Owls,7.5,2026-11-24 18:34:29,basketball_ncaab
+UIC Flames,-7.5,2026-11-24 18:34:29,basketball_ncaab
+Oregon St Beavers,-8.5,2026-11-24 18:34:29,basketball_ncaab
+San Francisco Dons,8.5,2026-11-24 18:34:29,basketball_ncaab
+BYU Cougars,1.5,2026-11-24 18:34:29,basketball_ncaab
+Ole Miss Rebels,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Appalachian St Mountaineers,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Yale Bulldogs,1.5,2026-11-24 18:34:29,basketball_ncaab
+Detroit Mercy Titans,4.5,2026-11-24 18:34:29,basketball_ncaab
+North Dakota Fighting Hawks,-4.5,2026-11-24 18:34:29,basketball_ncaab
+Maryland Terrapins,2.5,2026-11-24 18:34:29,basketball_ncaab
+Tennessee Volunteers,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Miami Hurricanes,-4.5,2026-11-24 18:34:29,basketball_ncaab
+TCU Horned Frogs,4.5,2026-11-24 18:34:29,basketball_ncaab
+Arkansas St Red Wolves,-5.5,2026-11-24 18:34:29,basketball_ncaab
+Long Beach St 49ers,5.5,2026-11-24 18:34:29,basketball_ncaab
+Lindenwood Lions,-1.5,2026-11-24 18:34:29,basketball_ncaab
+New Haven Chargers,1.5,2026-11-24 18:34:29,basketball_ncaab
+Illinois St Redbirds,1.5,2026-11-24 18:34:29,basketball_ncaab
+Tulsa Golden Hurricane,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Arizona Wildcats,-7.5,2026-11-24 18:34:29,basketball_ncaab
+Providence Friars,7.5,2026-11-24 18:34:29,basketball_ncaab
+Creighton Bluejays,5.5,2026-11-24 18:34:29,basketball_ncaab
+Michigan Wolverines,-5.5,2026-11-24 18:34:29,basketball_ncaab
+Iowa State Cyclones,-9.5,2026-11-24 18:34:29,basketball_ncaab
+San Diego St Aztecs,9.5,2026-11-24 18:34:29,basketball_ncaab
+Kent State Golden Flashes,8.5,2026-11-24 18:34:29,basketball_ncaab
+Wyoming Cowboys,-8.5,2026-11-24 18:34:29,basketball_ncaab
+DePaul Blue Demons,3.5,2026-11-24 18:34:29,basketball_ncaab
+Purdue Boilermakers,-3.5,2026-11-24 18:34:29,basketball_ncaab
+Eastern Michigan Eagles,4.5,2026-11-24 18:34:29,basketball_ncaab
+Kennesaw St Owls,-4.5,2026-11-24 18:34:29,basketball_ncaab
+Florida Atlantic Owls,-6.5,2026-11-24 18:34:29,basketball_ncaab
+Mercer Bears,6.5,2026-11-24 18:34:29,basketball_ncaab
+Queens University Royals,1.5,2026-11-24 18:34:29,basketball_ncaab
+Wofford Terriers,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Rutgers Scarlet Knights,-22.5,2026-11-24 18:34:29,basketball_ncaab
+Sacred Heart Pioneers,22.5,2026-11-24 18:34:29,basketball_ncaab
+Southern Indiana Screaming Eagles,4.5,2026-11-24 18:34:29,basketball_ncaab
+VMI Keydets,-4.5,2026-11-24 18:34:29,basketball_ncaab
+Elon Phoenix,7.5,2026-11-24 18:34:29,basketball_ncaab
+Furman Paladins,-7.5,2026-11-24 18:34:29,basketball_ncaab
+Lamar Cardinals,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Robert Morris Colonials,2.5,2026-11-24 18:34:29,basketball_ncaab
+Bellarmine Knights,2.5,2026-11-24 18:34:29,basketball_ncaab
+Georgia Southern Eagles,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Binghamton Bearcats,8.5,2026-11-24 18:34:29,basketball_ncaab
+Lehigh Mountain Hawks,-8.5,2026-11-24 18:34:29,basketball_ncaab
+Boston Univ. Terriers,5.5,2026-11-24 18:34:29,basketball_ncaab
+Harvard Crimson,-5.5,2026-11-24 18:34:29,basketball_ncaab
+Bowling Green Falcons,-11.5,2026-11-24 18:34:29,basketball_ncaab
+Gardner-Webb Bulldogs,11.5,2026-11-24 18:34:29,basketball_ncaab
+Bryant Bulldogs,2.5,2026-11-24 18:34:29,basketball_ncaab
+Marist Red Foxes,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Campbell Fighting Camels,1.5,2026-11-24 18:34:29,basketball_ncaab
+Coastal Carolina Chanticleers,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Charleston Southern Buccaneers,12.5,2026-11-24 18:34:29,basketball_ncaab
+James Madison Dukes,-12.5,2026-11-24 18:34:29,basketball_ncaab
+Chattanooga Mocs,-16.5,2026-11-24 18:34:29,basketball_ncaab
+Delaware St Hornets,16.5,2026-11-24 18:34:29,basketball_ncaab
+Coppin St Eagles,33.5,2026-11-24 18:34:29,basketball_ncaab
+Villanova Wildcats,-33.5,2026-11-24 18:34:29,basketball_ncaab
+Florida Gators,-33.5,2026-11-24 18:34:29,basketball_ncaab
+Milwaukee Panthers,33.5,2026-11-24 18:34:29,basketball_ncaab
+Georgia Tech Yellow Jackets,-10.5,2026-11-24 18:34:29,basketball_ncaab
+Samford Bulldogs,10.5,2026-11-24 18:34:29,basketball_ncaab
+Hampton Pirates,7.5,2026-11-24 18:34:29,basketball_ncaab
+Old Dominion Monarchs,-7.5,2026-11-24 18:34:29,basketball_ncaab
+Indiana Hoosiers,-27.5,2026-11-24 18:34:29,basketball_ncaab
+Jacksonville Dolphins,27.5,2026-11-24 18:34:29,basketball_ncaab
+Iowa Hawkeyes,-28.5,2026-11-24 18:34:29,basketball_ncaab
+UMBC Retrievers,28.5,2026-11-24 18:34:29,basketball_ncaab
+Loyola (MD) Greyhounds,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Rider Broncs,2.5,2026-11-24 18:34:29,basketball_ncaab
+Morgan St Bears,1.5,2026-11-24 18:34:29,basketball_ncaab
+Mt. St. Mary's Mountaineers,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Nevada Wolf Pack,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Santa Clara Broncos,1.5,2026-11-24 18:34:29,basketball_ncaab
+New Hampshire Wildcats,20.5,2026-11-24 18:34:29,basketball_ncaab
+Seton Hall Pirates,-20.5,2026-11-24 18:34:29,basketball_ncaab
+Ohio State Buckeyes,1.5,2026-11-24 18:34:29,basketball_ncaab
+Vanderbilt Commodores,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Siena Saints,-3.5,2026-11-24 18:34:29,basketball_ncaab
+Vermont Catamounts,3.5,2026-11-24 18:34:29,basketball_ncaab
+South Florida Bulls,-16.5,2026-11-24 18:34:29,basketball_ncaab
+Stetson Hatters,16.5,2026-11-24 18:34:29,basketball_ncaab
+Tarleton State Texans,1.5,2026-11-24 18:34:29,basketball_ncaab
+Weber State Wildcats,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Alcorn St Braves,15.5,2026-11-24 18:34:29,basketball_ncaab
+Louisiana Tech Bulldogs,-15.5,2026-11-24 18:34:29,basketball_ncaab
+Fort Wayne Mastodons,3.5,2026-11-24 18:34:29,basketball_ncaab
+SE Missouri St Redhawks,-3.5,2026-11-24 18:34:29,basketball_ncaab
+Houston Christian Huskies,-1.5,2026-11-24 18:34:29,basketball_ncaab
+UL Monroe Warhawks,1.5,2026-11-24 18:34:29,basketball_ncaab
+Tennessee Tech Golden Eagles,-14.5,2026-11-24 18:34:29,basketball_ncaab
+West Georgia Wolves,14.5,2026-11-24 18:34:29,basketball_ncaab
+Duquesne Dukes,10.5,2026-11-24 18:34:29,basketball_ncaab
+High Point Panthers,-10.5,2026-11-24 18:34:29,basketball_ncaab
+Air Force Falcons,-3.5,2026-11-24 18:34:29,basketball_ncaab
+Army Knights,3.5,2026-11-24 18:34:29,basketball_ncaab
+Alabama A&M Bulldogs,2.5,2026-11-24 18:34:29,basketball_ncaab
+North Alabama Lions,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Auburn Tigers,-24.5,2026-11-24 18:34:29,basketball_ncaab
+Lipscomb Bisons,24.5,2026-11-24 18:34:29,basketball_ncaab
+Bucknell Bison,10.5,2026-11-24 18:34:29,basketball_ncaab
+Cornell Big Red,-10.5,2026-11-24 18:34:29,basketball_ncaab
+Central Michigan Chippewas,20.5,2026-11-24 18:34:29,basketball_ncaab
+Notre Dame Fighting Irish,-20.5,2026-11-24 18:34:29,basketball_ncaab
+Drexel Dragons,5.5,2026-11-24 18:34:29,basketball_ncaab
+Pennsylvania Quakers,-5.5,2026-11-24 18:34:29,basketball_ncaab
+Florida A&M Rattlers,17.5,2026-11-24 18:34:29,basketball_ncaab
+South Alabama Jaguars,-17.5,2026-11-24 18:34:29,basketball_ncaab
+Green Bay Phoenix,1.5,2026-11-24 18:34:29,basketball_ncaab
+UMKC Kangaroos,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Louisville Cardinals,2.5,2026-11-24 18:34:29,basketball_ncaab
+Texas Tech Red Raiders,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Oral Roberts Golden Eagles,4.5,2026-11-24 18:34:29,basketball_ncaab
+UT-Arlington Mavericks,-4.5,2026-11-24 18:34:29,basketball_ncaab
+Clemson Tigers,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Washington Huskies,1.5,2026-11-24 18:34:29,basketball_ncaab
+Charleston Cougars,-1.5,2026-11-24 18:34:29,basketball_ncaab
+UTEP Miners,1.5,2026-11-24 18:34:29,basketball_ncaab
+Boise State Broncos,-18.5,2026-11-24 18:34:29,basketball_ncaab
+Idaho State Bengals,18.5,2026-11-24 18:34:29,basketball_ncaab
+Evansville Purple Aces,30.5,2026-11-24 18:34:29,basketball_ncaab
+Missouri Tigers,-30.5,2026-11-24 18:34:29,basketball_ncaab
+Florida St Seminoles,-29.5,2026-11-24 18:34:29,basketball_ncaab
+UNC Asheville Bulldogs,29.5,2026-11-24 18:34:29,basketball_ncaab
+Sam Houston St Bearkats,5.5,2026-11-24 18:34:29,basketball_ncaab
+Washington St Cougars,-5.5,2026-11-24 18:34:29,basketball_ncaab
+UC Santa Barbara Gauchos,-17.5,2026-11-24 18:34:29,basketball_ncaab
+UNC Greensboro Spartans,17.5,2026-11-24 18:34:29,basketball_ncaab
+Grand Canyon Antelopes,-2.5,2026-11-24 18:34:29,basketball_ncaab
+Saint Louis Billikens,2.5,2026-11-24 18:34:29,basketball_ncaab
+Alabama Crimson Tide,-1.5,2026-11-24 18:34:29,basketball_ncaab
+Baylor Bears,1.5,2026-11-24 18:34:29,basketball_ncaab
+Colorado St Rams,5.5,2026-11-24 18:34:29,basketball_ncaab
+VCU Rams,-5.5,2026-11-24 18:34:29,basketball_ncaab
+Oregon Ducks,10.5,2026-11-24 18:34:29,basketball_ncaab
+St. John's Red Storm,-10.5,2026-11-24 18:34:29,basketball_ncaab
+Colorado Buffaloes,3.5,2026-11-24 18:34:29,basketball_ncaab
+Stanford Cardinal,-3.5,2026-11-24 18:34:29,basketball_ncaab
+Gonzaga Bulldogs,-15.5,2026-11-24 18:34:29,basketball_ncaab
+Kansas St Wildcats,15.5,2026-11-24 18:34:29,basketball_ncaab
+Green Bay Packers,2.5,2026-11-24 18:34:29,americanfootball_nfl
+Los Angeles Rams,-2.5,2026-11-24 18:34:29,americanfootball_nfl
+Chicago Bears,-2.5,2026-11-24 18:34:29,americanfootball_nfl
+Detroit Lions,2.5,2026-11-24 18:34:29,americanfootball_nfl
+Dallas Cowboys,-8.5,2026-11-24 18:34:29,americanfootball_nfl
+Philadelphia Eagles,8.5,2026-11-24 18:34:29,americanfootball_nfl
+Buffalo Bills,-2.5,2026-11-24 18:34:29,americanfootball_nfl
+Kansas City Chiefs,2.5,2026-11-24 18:34:29,americanfootball_nfl
+Denver Broncos,-2.5,2026-11-24 18:34:29,americanfootball_nfl
+Pittsburgh Steelers,2.5,2026-11-24 18:34:29,americanfootball_nfl
+Atlanta Falcons,6.5,2026-11-24 18:34:29,americanfootball_nfl
+Minnesota Vikings,-6.5,2026-11-24 18:34:29,americanfootball_nfl
+Baltimore Ravens,6.5,2026-11-24 18:34:29,americanfootball_nfl
+Houston Texans,-6.5,2026-11-24 18:34:29,americanfootball_nfl
+Cincinnati Bengals,-9.5,2026-11-24 18:34:29,americanfootball_nfl
+New Orleans Saints,9.5,2026-11-24 18:34:29,americanfootball_nfl
+Indianapolis Colts,6.5,2026-11-24 18:34:29,americanfootball_nfl
+New York Giants,-6.5,2026-11-24 18:34:29,americanfootball_nfl
+Jacksonville Jaguars,-14.5,2026-11-24 18:34:29,americanfootball_nfl
+Tennessee Titans,14.5,2026-11-24 18:34:29,americanfootball_nfl
+Miami Dolphins,3.5,2026-11-24 18:34:29,americanfootball_nfl
+New York Jets,-3.5,2026-11-24 18:34:29,americanfootball_nfl
+Los Angeles Chargers,-1.5,2026-11-24 18:34:29,americanfootball_nfl
+New England Patriots,1.5,2026-11-24 18:34:29,americanfootball_nfl
+Arizona Cardinals,7.5,2026-11-24 18:34:29,americanfootball_nfl
+Washington Commanders,-7.5,2026-11-24 18:34:29,americanfootball_nfl
+San Francisco 49ers,-3.0,2026-11-24 18:34:29,americanfootball_nfl
+Seattle Seahawks,3.0,2026-11-24 18:34:29,americanfootball_nfl
+Cleveland Browns,-4.5,2026-11-24 18:34:29,americanfootball_nfl
+Las Vegas Raiders,4.5,2026-11-24 18:34:29,americanfootball_nfl
+Carolina Panthers,3.0,2026-11-24 18:34:29,americanfootball_nfl
+Tampa Bay Buccaneers,-3.0,2026-11-24 18:34:29,americanfootball_nfl
+Edmonton Oilers,2.0,2026-11-24 18:34:29,icehockey_nhl
+Vegas Golden Knights,1.83,2026-11-24 18:34:29,icehockey_nhl
+Boston Bruins,1.64,2026-11-24 18:34:29,icehockey_nhl
+Winnipeg Jets,2.3,2026-11-24 18:34:29,icehockey_nhl
+Buffalo Sabres,1.71,2026-11-24 18:34:29,icehockey_nhl
+New York Rangers,2.16,2026-11-24 18:34:29,icehockey_nhl
+Calgary Flames,2.32,2026-11-24 18:34:29,icehockey_nhl
+Pittsburgh Penguins,1.62,2026-11-24 18:34:29,icehockey_nhl
+Carolina Hurricanes,1.75,2026-11-24 18:34:29,icehockey_nhl
+Tampa Bay Lightning,2.12,2026-11-24 18:34:29,icehockey_nhl
+Columbus Blue Jackets,2.26,2026-11-24 18:34:29,icehockey_nhl
+New Jersey Devils,1.66,2026-11-24 18:34:29,icehockey_nhl
+Florida Panthers,1.75,2026-11-24 18:34:29,icehockey_nhl
+Ottawa Senators,2.12,2026-11-24 18:34:29,icehockey_nhl
+New York Islanders,1.88,2026-11-24 18:34:29,icehockey_nhl
+St Louis Blues,1.94,2026-11-24 18:34:29,icehockey_nhl
+Philadelphia Flyers,2.28,2026-11-24 18:34:29,icehockey_nhl
+Washington Capitals,1.65,2026-11-24 18:34:29,icehockey_nhl
+Detroit Red Wings,1.44,2026-11-24 18:34:29,icehockey_nhl
+Vancouver Canucks,2.84,2026-11-24 18:34:29,icehockey_nhl
+Dallas Stars,1.59,2026-11-24 18:34:29,icehockey_nhl
+Nashville Predators,2.4,2026-11-24 18:34:29,icehockey_nhl
+Minnesota Wild,1.66,2026-11-24 18:34:29,icehockey_nhl
+Utah Mammoth,2.26,2026-11-24 18:34:29,icehockey_nhl
+Colorado Avalanche,1.76,2026-11-24 18:34:29,icehockey_nhl
+Montréal Canadiens,2.1,2026-11-24 18:34:29,icehockey_nhl
+Chicago Blackhawks,2.38,2026-11-24 18:34:29,icehockey_nhl
+Seattle Kraken,1.6,2026-11-24 18:34:29,icehockey_nhl
+Anaheim Ducks,1.71,2026-11-24 18:34:29,icehockey_nhl
+San Jose Sharks,2.16,2026-11-24 18:34:29,icehockey_nhl
